@@ -1,0 +1,1 @@
+<form method="post" action="{{ route('vacancies.destroy', $vacancy) }}" onsubmit="return confirm('Hapus lowongan ini dari daftar?')">@csrf @method('DELETE')<button type="submit" class="danger" aria-label="Hapus {{ $vacancy->title }}">Hapus</button></form>

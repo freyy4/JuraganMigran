@@ -1,0 +1,2 @@
+@props(['name','label','options'=>[],'value'=>'','id','wide'=>false])
+<div @class(['crm-filter-field','crm-filter-wide'=>$wide])><label for="{{ $id }}">{{ $label }}</label><select id="{{ $id }}" name="{{ $name }}"><option value="">Semua {{ strtolower($label) }}</option>@foreach($options as $key=>$text)<option value="{{ $key }}" @selected((string)$value===(string)$key)>{{ $text }}</option>@endforeach</select></div>

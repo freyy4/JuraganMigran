@@ -1,0 +1,100 @@
+:root{color-scheme:light}.theme-toggle{background:#eff4fb;color:#1e40af;border:1px solid #dbe5f1;border-radius:10px;cursor:pointer;display:inline-flex!important;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;padding:9px 12px;white-space:nowrap;font-size:12px;flex-shrink:0}.theme-toggle svg{flex-shrink:0}.theme-sun{display:none}html[data-theme=dark] .theme-sun{display:block}html[data-theme=dark] .theme-moon{display:none}.login-theme-control{display:flex;justify-content:flex-end;margin-bottom:16px}
+html[data-theme=dark]{color-scheme:dark;--jm-bg:#0f172a;--jm-surface:#182338;--jm-border:#334155;--jm-text:#e2e8f0;--jm-muted:#a6b5ca;--jm-blue-600:#7db2ff;--jm-blue-500:#7db2ff}
+html[data-theme=dark] body{background:#0f172a;color:#e2e8f0}
+html[data-theme=dark] :is(.card,.portal-card,.application-card,.crm-sidebar,.crm-topbar,.portal-header,.portal-bottom-nav,.menu-dashboard-category,.kanban-column,.kanban-card,.cockpit-metric,.system-detail,.system-log-panel,.builder-library-panel,.builder-properties-panel,dialog){background:#182338!important;color:#e2e8f0!important;border-color:#334155!important;box-shadow:none}
+html[data-theme=dark] :is(.crm-workspace,.crm-layout,.portal-body,.login-page){background:#0f172a!important;color:#e2e8f0}
+html[data-theme=dark] :is(input,select,textarea){background:#111c2e!important;color:#e2e8f0!important;border-color:#475569!important;accent-color:#80b3ff}
+html[data-theme=dark] input::placeholder,html[data-theme=dark] textarea::placeholder{color:#94a3b8}
+html[data-theme=dark] :is(.muted,small,.metric-card span,.user-name,.topbar-title small,.portal-notification p,.portal-schedule p,.portal-disclaimer,.portal-stage-grid small){color:#a6b5ca!important}
+html[data-theme=dark] :is(h1,h2,h3,label,dt,dd,th,td,.brand,.topbar-title strong,.sidebar-brand,.sidebar-group summary,.sidebar-nav a,.sidebar-menu a,.menu-dashboard-category h2,.menu-dashboard-link,.cockpit-metric strong,.cockpit-metric span){color:#e2e8f0}
+html[data-theme=dark] a{color:#90bdff}
+html[data-theme=dark] :is(button,.button){background:#2563eb;color:#fff}
+html[data-theme=dark] :is(.secondary,.theme-toggle,.badge,.date-tile,.portal-install,.portal-summary a,.portal-card.current-stage,.menu-dashboard-icon,.menu-dashboard-count,.metric-icon,.system-level,.finance-invoice-status){background:#223753!important;color:#b5d4ff!important;border-color:#3b5374!important}
+html[data-theme=dark] :is(thead,th,.kanban-heading,.table-card thead,.system-log-heading){background:#223047!important;color:#dce7f5!important}
+html[data-theme=dark] :is(td,th,tr,.portal-notification,fieldset,.sidebar-group,.crm-sidebar,.crm-topbar,.menu-dashboard-link,.cockpit-row,.work-queue-row){border-color:#334155!important}
+html[data-theme=dark] :is(tbody tr:hover,.menu-dashboard-link:hover,.sidebar-nav a:hover,.sidebar-group summary:hover){background:#223047!important}
+html[data-theme=dark] :is(.sidebar-nav a[aria-current=page],.sidebar-group a[aria-current=page],.portal-bottom-nav a[aria-current=page]){background:#243d60!important;color:#bad6ff!important}
+html[data-theme=dark] :is(.notice,.is-clear,.finance-day-detail){background:#163d34!important;color:#b0f1d4!important;border-color:#286453!important}
+html[data-theme=dark] :is(.errors,.critical,.is-overdue,.overdue){background:#492633!important;color:#ffd0d6!important;border-color:#824450!important}
+html[data-theme=dark] :is(.portal-card.next-action,.portal-network,.level-warn){background:#423622!important;color:#f8dfaf!important;border-color:#735a34!important}
+html[data-theme=dark] :is(.portal-stage-grid li>span,.process-timeline li,.finance-chart-day){background:#223047!important;color:#c7d9f0!important;border-color:#3b5374!important}
+html[data-theme=dark] .portal-stage-grid .is-current>span{background:#244673!important;color:#d6e7ff!important;border-color:#7db2ff!important;box-shadow:none}
+html[data-theme=dark] .portal-stage-grid .is-complete>span{background:#164637!important;color:#b0f1d4!important}
+html[data-theme=dark] :is(.portal-welcome,.portal-login-intro,.menu-dashboard-hero,.finance-hero,.system-hero) :is(h1,h2,strong,small,p){color:#f1f5ff!important}
+html[data-theme=dark] .whatsapp{background:#166534!important;color:white!important}
+html[data-theme=dark] .theme-toggle:focus-visible{outline:3px solid #f5c26b;outline-offset:3px}
+@media(max-width:767px){.crm-topbar .theme-toggle [data-theme-label],.portal-header .theme-toggle [data-theme-label]{display:none}.crm-topbar .theme-toggle,.portal-header .theme-toggle{padding:8px;min-width:44px}.topbar-user{gap:8px}.portal-header .theme-toggle{margin-left:auto}}
+html[data-theme=dark]{background:#0f172a;color:#e2e8f0}html[data-theme=dark] :is(.login-brand,.profile-name,.empty,.pagination span,.contact-heading,.sidebar-label,.sidebar-brand-label){color:#cbd5e1!important}html[data-theme=dark] :is(.contact,.document-heading,.form-section,.system-card,.system-details,.system-log-table,.system-filter-bar){background:#182338!important;color:#e2e8f0!important;border-color:#334155!important}html[data-theme=dark] :is(.blocker-overdue,.overdue-badge){background:#492633!important;color:#ffd0d6!important}
+
+/* Shared surfaces, including modules loaded after the theme stylesheet. */
+html[data-theme=dark]{--jm-blue-600:#2563eb;--jm-blue-500:#3b82f6;--jm-navy-900:#0b1f3a;--jm-dark-raised:#223047;--jm-dark-input:#111c2e}
+html[data-theme=dark] :is(.menu-dashboard-link,.dashboard-links a,.dashboard-links>span,.quick-action-grid a,.system-section-nav a,.system-integration,.system-integration[open],.system-integration[open] summary,.system-level-filters a,.cockpit-inline-filter,.cashflow-summary>span,.rotator-member-form,.reference,.portal-shell,.public-header,.builder-canvas-panel,.builder-step,.builder-rule,.canvas-thank-you,.canvas-field,.canvas-public-viewport,.canvas-edit-outline>summary,.builder-info>span,.site-editor-canvas,.site-editor-properties .item-editor,.jm-tracking-consent){background:var(--jm-surface)!important;color:var(--jm-text)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.menu-dashboard-link,.dashboard-links a,.quick-action-grid a,.system-section-nav a,.system-level-filters a){text-decoration:none}
+html[data-theme=dark] :is(.menu-dashboard-link:hover,.menu-dashboard-link:focus-visible,.dashboard-links a:hover,.dashboard-links a:focus-visible,.quick-action-grid a:hover,.system-section-nav a:hover,.system-level-filters a:hover){background:#243d60!important;color:#dbeafe!important;border-color:#638bbd!important}
+html[data-theme=dark] :is(.menu-dashboard-link>span,.menu-dashboard-link:hover>span,.menu-dashboard-link:focus-visible>span,.dashboard-links a>span){color:inherit!important}
+html[data-theme=dark] :is(.menu-dashboard-category header,.menu-dashboard-category-heading,.menu-dashboard-category h2,.sidebar-group[open] summary){background:transparent!important;color:var(--jm-text)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.sidebar-nav .is-active,.crm-layout:has(#builder-form) .sidebar-nav .is-active){background:#243d60!important;color:#dbeafe!important}
+html[data-theme=dark] :is(.user-avatar,.portal-avatar,.portal-bell,.row-icon,.system-service-icon,.system-service-status,.system-service-status.is-configured,.logout-confirmation-icon,.builder-device-switcher,.builder-property-tabs,.application-form-icon){background:#223753!important;color:#b5d4ff!important;border-color:#3b5374!important}
+html[data-theme=dark] :is(.sidebar-links,.sidebar-footer,.sidebar-brand,.cockpit-panel,.system-integration,.system-section-nav a,.system-level-filters a,.builder-info,.builder-step,.builder-rule,.application-step,.portal-card hr,hr){border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.chart-bar-track,.bar-track,.form-step-track,.portal-progress-value progress,.builder-drop-zone){background:var(--jm-dark-raised)!important;border-color:#475569!important}
+html[data-theme=dark] .portal-progress-value progress::-webkit-progress-bar{background:var(--jm-dark-raised)}
+html[data-theme=dark] :is(.system-service-name,.system-section-heading,.cockpit-row strong,.work-queue-row strong,.cashflow-summary strong,.finance-chart-day strong,.portal-stage-grid strong,.portal-summary strong,.portal-progress-value strong,.public-header a,.system-integration summary,.builder-info strong,.builder-hint){color:var(--jm-text)!important}
+html[data-theme=dark] :is(.system-service-status,.cockpit-row small,.system-detail dt,.system-log-tools label,.cashflow-summary span,.portal-summary span,.portal-stage-grid small,.ops-policy-rules p,.ops-calendar>strong,.hero-trust,.step-help,.form-help,.field-hint){color:var(--jm-muted)!important}
+html[data-theme=dark] :is(.danger,.builder-danger,.readiness-blocker,.system-level.level-error,.system-level-filters .level-error.is-selected,.finance-invoice-status.is-overdue,.logout-confirmation-actions .logout-confirm-button){background:#492633!important;color:#ffd0d6!important;border-color:#824450!important}
+html[data-theme=dark] :is(.readiness-success,.builder-auto-save,.system-security .security-alert.is-clear,.system-level-filters .level-integration.is-selected){background:#163d34!important;color:#b0f1d4!important;border-color:#286453!important}
+html[data-theme=dark] :is(.readiness-warning,.security-alert,.system-level.level-warn,.system-level-filters .level-warn.is-selected,.row-icon.warning,.site-preview-banner){background:#423622!important;color:#f8dfaf!important;border-color:#735a34!important}
+html[data-theme=dark] :is(.readiness-info,.system-level-filters .is-selected,.drop-target){background:#223753!important;color:#b5d4ff!important;border-color:#638bbd!important}
+html[data-theme=dark] :is(.system-level.level-security,.system-level-filters .level-security.is-selected){background:#352749!important;color:#dec5ff!important;border-color:#665084!important}
+html[data-theme=dark] :is(.field-error,.required){color:#ffb4c0!important}
+html[data-theme=dark] :is(.crm-layout #main-content form fieldset,.crm-layout main:not(:has(#builder-form)) .rotator-member-form){background:var(--jm-surface)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(input[aria-invalid=true],.crm-layout main:not(:has(#builder-form)) form input[aria-invalid=true]){background:#2d1e2e!important;border-color:#fb7185!important}
+html[data-theme=dark] input[type=file]::file-selector-button{background:#223753!important;color:#b5d4ff!important;border-color:#3b5374!important}
+html[data-theme=dark] :is(input,select,textarea):disabled{background:#1e293b!important;color:#a6b5ca!important;opacity:1}
+html[data-theme=dark] option{background:var(--jm-dark-input);color:var(--jm-text)}
+html[data-theme=dark] :is(a.button.secondary:hover,a.button.secondary:focus-visible,.secondary:hover,.secondary:focus-visible){background:#2c466a!important;color:#e2edff!important;border-color:#638bbd!important}
+html[data-theme=dark] :is(a,button,input,select,textarea,summary):focus-visible{outline-color:#93c5fd}
+html[data-theme=dark] dialog::backdrop{background:#020617b3}
+html[data-theme=dark] :is(.logout-confirmation,.skip-link:focus,.skip-content:focus,.site-skip:focus){background:var(--jm-surface)!important;color:var(--jm-text)!important;border-color:var(--jm-border)!important}
+
+/* Editor controls and the shared public funnel renderer. */
+html[data-theme=dark] :is(#block-library button,#field-library button,.canvas-element-tools button,.builder-toolbar #save-draft,#builder-workspace .builder-library-panel>.heading,#builder-workspace.library-drawer-open .builder-library-panel){background:var(--jm-surface)!important;color:var(--jm-text)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(#block-library button::before,#field-library button::before,.field-preset::before,.canvas-block>small){background:#223753!important;color:#b5d4ff!important}
+html[data-theme=dark] :is(.builder-property-tabs button[aria-selected=true],.builder-page-tabs button[aria-selected=true],.builder-device-switcher button[aria-pressed=true]){background:#243d60!important;color:#dbeafe!important;border-color:#638bbd!important}
+html[data-theme=dark] :is(.builder-device-switcher button,.builder-property-tabs button){color:#cbd5e1!important}
+html[data-theme=dark] :is(.canvas-block,.landing-stacked .landing-block,.landing-stacked .muted-block,.landing-items li,.funnel-page .landing-items li,.vacancy-summary>div,.funnel-page .vacancy-summary>div,.funnel-page .hero-trust li,.funnel-page .application-progress,.funnel-page .application-consent,.funnel-page #form-review){background:var(--jm-surface)!important;color:var(--jm-text)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.canvas-hero,.landing-stacked .landing-hero,.funnel-page .landing-hero){background:linear-gradient(115deg,#16334e,#163d37)!important;color:var(--jm-text)!important}
+html[data-theme=dark] :is(.landing-hero h1,.landing-hero p,.landing-items li,.landing-items li strong,.vacancy-summary dd,.application-card h2,.application-progress strong,.application-consent label,#form-review){color:var(--jm-text)!important}
+html[data-theme=dark] :is(.landing-process_steps .landing-items li::before,.success-symbol){background:#164637!important;color:#b0f1d4!important}
+html[data-theme=dark] .ops-calendar-holiday{background:#492633!important;color:#ffd0d6!important}
+html[data-theme=dark] .builder-auto-save:has(+ #retry-save:not([hidden])){background:#492633!important;color:#ffd0d6!important}
+html[data-theme=dark] :is(.public-site .site-trust,.public-site .site-footer){border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.public-site .site-trust span,.public-site .site-steps li,.public-site .site-countries a,.public-site .site-trust-item strong,.public-site .site-detail p,.public-site .site-detail li,.public-site .site-footer p){color:var(--jm-text)!important}
+html[data-theme=dark] :is(.public-site .site-footer a,.public-site .site-disclaimer a){color:#90bdff!important}
+html[data-theme=dark] :is(.finance-chart-day .cashflow-values,.finance-day-detail p,.system-log-table code,.jm-tracking-consent label){color:inherit!important}
+html[data-theme=dark] body.public-application{background-color:var(--jm-bg)!important}
+html[data-theme=dark] .public-application .has-text-color{--configured-text:var(--jm-text)!important}
+html[data-theme=dark] :is(.public-application .has-block-background:not(.navy-block),.public-application .has-block-background.muted-block){background:var(--jm-surface)!important;color:var(--jm-text)!important}
+html[data-theme=dark] :is(.public-application .application-eyebrow,.public-application #form-progress,.public-application .application-progress small,.portal-progress-value strong){color:#90bdff!important}
+html[data-theme=dark] :is(.cockpit-tabs button,.builder-page-tabs button,.builder-property-tabs button,.portal-document-filters button){background:var(--jm-dark-raised)!important;color:var(--jm-text)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.cockpit-tabs button[aria-selected=true],.builder-page-tabs button[aria-selected=true],.builder-property-tabs button[aria-selected=true],.portal-document-filters button[aria-pressed=true]){background:#243d60!important;color:#dbeafe!important;border-color:#638bbd!important}
+html[data-theme=dark] :is(.sidebar-brand .brand,.sidebar-user,.sidebar-close,.step-select,.crm-layout main form fieldset legend,.funnel-page .application-field label,.funnel-page #review-values dd){color:var(--jm-text)!important}
+html[data-theme=dark] :is(.process-timeline li span,.cockpit-row p,.cockpit-empty,.eyebrow,.builder-info,.builder-drop-zone,#preview-status,.system-integration-detail,.funnel-page .landing-block>p,.funnel-page .landing-block details p,.funnel-page .application-intro,.funnel-page #review-values dt){color:var(--jm-muted)!important}
+html[data-theme=dark] :is(.system-service-status.is-responsive,.system-level.level-integration){background:#163d34!important;color:#b0f1d4!important;border-color:#286453!important}
+html[data-theme=dark] :is(.block-library button,.finance-cockpit .cockpit-inline-filter button){background:#223753!important;color:#b5d4ff!important;border-color:#3b5374!important}
+html[data-theme=dark] .portal-bottom-nav a{color:var(--jm-muted)!important}
+html[data-theme=dark] .pagination nav a{background:#223753!important;color:#b5d4ff!important;border-color:#3b5374!important}
+html[data-theme=dark] :is(label,legend){color:var(--jm-text)!important}
+html[data-theme=dark] :is(dt,.finance-hero label){color:#cbd5e1!important}
+html[data-theme=dark] .finance-cockpit .finance-hero{background:linear-gradient(115deg,#114b54,#166761 60%,#1c766e)!important}
+
+html[data-theme=dark] .public-application .has-block-background.navy-block{background:var(--jm-navy-900)!important;color:var(--jm-text)!important}
+
+.canvas-remove-button{background:#fff;color:#b91c1c}
+html[data-theme=dark] :is(#builder-preview,#site-canvas,.canvas-public-viewport iframe){background:var(--jm-surface)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.system-hero .system-refresh,.system-service-status,.menu-dashboard-summary){background:var(--jm-dark-raised)!important;color:var(--jm-text)!important;border-color:var(--jm-border)!important}
+html[data-theme=dark] :is(.canvas-remove-button,.canvas-remove-button:hover){background:#492633!important;color:#ffd0d6!important;border-color:#824450!important}
+html[data-theme=dark] .canvas-remove-button:disabled{background:#223047!important;color:#a6b5ca!important;border-color:#475569!important}
+html[data-theme=dark] :is(.system-security .quick-action-grid a:nth-child(2),.system-service-status.is-configured){background:#352749!important;color:#d9c5ff!important;border-color:#654b83!important}
+html[data-theme=dark] :is(.system-security .quick-action-grid a:nth-child(4),.finance-cockpit .direction-out .row-icon,.builder-info .badge){background:#423622!important;color:#f8dfaf!important;border-color:#735a34!important}
+html[data-theme=dark] :is(.system-section-nav a:hover,.quick-action-grid a:hover,.dashboard-links a:hover){background:#243d60!important;color:#d6e7ff!important;border-color:#5376a3!important}
+html[data-theme=dark] :is(.block-library button[data-add-block=video],.block-library button[data-add-block=faq])::before{background:#223753!important;color:#b5d4ff!important}

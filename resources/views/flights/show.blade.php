@@ -1,0 +1,6 @@
+@extends('layouts.candidates')
+@section('title', 'Detail Penerbangan')
+@section('content')
+<a class="back" href="{{ route('flights.index') }}">← Jadwal penerbangan</a><div class="heading"><h1>Detail Penerbangan</h1><div class="actions"><a class="button" href="{{ route('flights.edit',$flight) }}">Edit Penerbangan</a>@include('flights.delete')</div></div>
+<section class="card"><dl class="grid">@foreach(['CPMI'=>$flight->application?->candidate?->person?->full_name,'Kode lamaran'=>$flight->application?->application_code,'Mitra'=>$flight->application?->vacancy?->jobOrder?->company?->name,'Negara'=>$flight->application?->vacancy?->jobOrder?->country?->name,'Maskapai'=>$flight->airline,'Nomor penerbangan'=>$flight->flight_number,'Bandara asal'=>$flight->departure_airport,'Bandara tujuan'=>$flight->arrival_airport,'Waktu berangkat (WIB)'=>$flight->departure_at?->copy()->setTimezone(\App\Models\FlightDetail::TIMEZONE)->format('d/m/Y H:i'),'Waktu tiba (WIB)'=>$flight->arrival_at?->copy()->setTimezone(\App\Models\FlightDetail::TIMEZONE)->format('d/m/Y H:i')] as $label=>$value)<div><dt>{{ $label }}</dt><dd>{{ $value ?: '—' }}</dd></div>@endforeach</dl>@if($flight->application && !$flight->application->trashed())<p><a href="{{ route('applications.show',$flight->application) }}">Detail Lamaran</a></p>@endif</section>
+@endsection

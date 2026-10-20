@@ -1,0 +1,2 @@
+@props(['name'=>'search','label'=>'Pencarian','value'=>'','placeholder'=>'Cari…','id'])
+<div class="crm-filter-field crm-search-field"><label for="{{ $id }}">{{ $label }}</label><div class="crm-search-control"><x-ui-icon name="search"/><input type="search" id="{{ $id }}" name="{{ $name }}" value="{{ $value }}" placeholder="{{ $placeholder }}" maxlength="255" autocomplete="off" data-crm-search></div></div>

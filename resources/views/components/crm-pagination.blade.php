@@ -1,0 +1,2 @@
+@props(['rows', 'label' => 'data'])
+<div class="pagination"><span>{{ $rows->total() ? $rows->firstItem().'–'.$rows->lastItem() : '0' }} dari {{ $rows->total() }} {{ $label }}</span><nav aria-label="Navigasi {{ $label }}">@if($rows->onFirstPage())<span>Sebelumnya</span>@else<a href="{{ $rows->previousPageUrl() }}" rel="prev">Sebelumnya</a>@endif<span>Halaman {{ $rows->currentPage() }} dari {{ $rows->lastPage() }}</span>@if($rows->hasMorePages())<a href="{{ $rows->nextPageUrl() }}" rel="next">Berikutnya</a>@else<span>Berikutnya</span>@endif</nav></div>

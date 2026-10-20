@@ -1,0 +1,2 @@
+@props(['label','value','tone'=>'blue','icon'=>'chart','href'=>null,'meta'=>''])
+<a class="crm-kpi crm-tone-{{ $tone }}" href="{{ $href ?? '#' }}" @if(!$href) aria-disabled="true" tabindex="-1" @endif><span class="crm-kpi-icon"><x-ui-icon :name="$icon"/></span><span><small>{{ $label }}</small><strong>{{ number_format((int)$value,0,',','.') }}</strong>@if($meta)<small>{{ $meta }}</small>@endif</span>@if($href)<span class="crm-kpi-arrow" aria-hidden="true">›</span>@endif</a>

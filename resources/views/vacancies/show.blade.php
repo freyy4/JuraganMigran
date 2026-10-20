@@ -1,0 +1,14 @@
+@extends('layouts.candidates')
+@section('title', 'Detail Lowongan')
+@section('content')
+<a class="back" href="{{ route('vacancies.index') }}">← Daftar lowongan</a>
+<div class="heading"><div><h1>{{ $vacancy->title }}</h1><p class="muted">{{ $vacancy->code }}</p></div><div class="actions"><a class="button" href="{{ route('vacancies.edit',$vacancy) }}">Edit Lowongan / Persyaratan</a><a class="button secondary" href="{{ route('campaigns.create', ['vacancy_id' => $vacancy->id]) }}">+ Kampanye</a><a class="button secondary" href="{{ route('landing-pages.create', ['vacancy_id' => $vacancy->id]) }}">+ Halaman Pendaftaran</a>@include('vacancies.delete')</div></div>
+<p><a class="button secondary" href="{{ route('site-vacancies.edit',$vacancy) }}">Publikasi Website & SEO</a></p><section class="card"><h2>Informasi lowongan</h2><dl class="grid">
+@foreach(['Kode'=>$vacancy->code,'Posisi'=>$vacancy->position_name,'Mitra'=>$vacancy->jobOrder?->company?->name,'Negara'=>$vacancy->jobOrder?->country?->name,'Kuota'=>number_format($vacancy->quota,0,',','.'),'Gaji'=>$vacancy->salary !== null ? $vacancy->currency.' '.number_format((float)$vacancy->salary,2,',','.') : null,'Durasi kontrak'=>$vacancy->contract_duration,'Status'=>\App\Models\Company::statusLabel($vacancy->status),'Jumlah pelamar'=>$vacancy->applications_count,'Tanggal publikasi'=>$vacancy->published_at?->format('d/m/Y H:i')] as $label=>$value)<div><dt>{{ $label }}</dt><dd>{{ $value ?? '—' }}</dd></div>@endforeach
+<div><dt>Permintaan tenaga kerja</dt><dd>@if($vacancy->jobOrder)<a href="{{ route('job-orders.show',$vacancy->jobOrder) }}">{{ $vacancy->jobOrder->code }}</a>@else — @endif</dd></div><div class="full"><dt>Deskripsi</dt><dd>{{ $vacancy->description ?: '—' }}</dd></div>
+</dl></section>
+<section class="card"><h2>Persyaratan</h2>@forelse($requirements as $requirement)
+<div class="contact"><div class="heading"><strong>{{ $requirement->definition?->name ?? 'Definisi tidak tersedia' }}</strong><span class="badge">{{ $requirement->is_required ? 'Wajib' : 'Opsional' }}</span></div>
+<dl class="grid"><div><dt>Ketentuan</dt><dd>{{ $requirement->definition?->operators()[$requirement->operator] ?? $requirement->operator ?? '—' }}</dd></div><div><dt>Nilai</dt><dd>@if($requirement->operator === 'between'){{ $requirement->value_min }} – {{ $requirement->value_max }}@elseif($requirement->definition?->inputType() === 'boolean'){{ $requirement->value === '1' ? 'Ya' : 'Tidak' }}@else{{ $requirement->value ?? '—' }}@endif {{ $requirement->definition?->unit }}</dd></div><div><dt>Kategori</dt><dd>{{ $requirement->definition?->category ?? '—' }}</dd></div><div><dt>Referensi sumber</dt><dd>{{ $requirement->source_reference ?: '—' }}</dd></div></dl>
+</div>@empty<p class="muted">Belum ada persyaratan untuk lowongan ini.</p>@endforelse</section>
+@endsection

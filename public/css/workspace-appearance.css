@@ -1,0 +1,111 @@
+/* Shared administration appearance. Standalone editors retain their own controls. */
+.crm-layout{
+    --form-surface:#fff;
+    --form-section:#f8fafc;
+    --form-raised:#edf3fb;
+    --form-field:#fff;
+    --form-text:#263b56;
+    --form-muted:#586b83;
+    --form-border:#cbd5e1;
+    --form-accent:#245cce;
+    --form-focus:#2563eb;
+    --form-disabled:#edf1f6;
+    --form-error:#b42340;
+}
+html[data-theme=dark] .crm-layout{
+    --form-surface:#182338;
+    --form-section:#152034;
+    --form-raised:#223149;
+    --form-field:#111c2e;
+    --form-text:#e2e8f0;
+    --form-muted:#b1bfd2;
+    --form-border:#475973;
+    --form-accent:#a6caff;
+    --form-focus:#87b9ff;
+    --form-disabled:#26354b;
+    --form-error:#ffb4c4;
+    --surface:var(--form-surface);
+    --card:var(--form-surface);
+    --text:var(--form-text);
+    --muted:var(--form-muted);
+    --border:var(--form-border);
+}
+.crm-layout #main-content :is(.grid,.filters,.form-field,fieldset){min-width:0}
+.crm-layout #main-content form :is(input,select,textarea){font:inherit;max-width:100%}
+.crm-layout:not(:has(#builder-form)) #main-content form :is(input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]):not([type=submit]):not([type=button]),select,textarea){
+    border:1px solid var(--form-border);
+    background:var(--form-field);
+    color:var(--form-text);
+    border-radius:9px;
+    line-height:1.5;
+    font-weight:400;
+    box-shadow:none;
+}
+.crm-layout:not(:has(#builder-form)) #main-content form :is(input,select,textarea):focus-visible{
+    border-color:var(--form-focus)!important;
+    outline:2px solid var(--form-focus);
+    outline-offset:2px;
+}
+.crm-layout #main-content form :is(input,textarea)::placeholder{color:var(--form-muted);opacity:.8}
+.crm-layout:not(:has(#builder-form)) #main-content form select[multiple]{height:auto!important;min-height:112px!important;padding:8px!important}
+.crm-layout #main-content form select[multiple] option{padding:6px 8px}
+.crm-layout #main-content form label{line-height:1.6}
+.crm-layout #main-content form :is(.form-field,.grid>div)>label{display:block;margin:0 0 8px}
+.crm-layout #main-content form .form-field>.muted{line-height:1.7;margin-top:7px}
+.crm-layout #main-content form :is(input[type=checkbox],input[type=radio]){accent-color:#397df0}
+.crm-layout #main-content form :is(input[type=color],input[type=range]){min-width:0;max-width:100%}
+.crm-layout #main-content form input[type=color]{padding:4px;min-height:36px;cursor:pointer}
+.crm-layout #main-content form label:has(>input[type=checkbox]),.crm-layout #main-content form label:has(>input[type=radio]){cursor:pointer}
+.crm-layout #main-content form :is(input,select,textarea)[aria-invalid=true]{border-color:var(--form-error)!important;outline-color:var(--form-error)}
+.crm-layout #main-content .field-error{color:var(--form-error)!important;line-height:1.6}
+.crm-layout #main-content :is(button,.button):focus-visible{outline:2px solid var(--form-focus);outline-offset:3px}
+.crm-layout #main-content form :is(button,.button){line-height:1.5}
+.crm-layout #main-content :is(.filters,.filter-actions,.footer-actions) :is(button,.button){display:inline-flex;align-items:center;justify-content:center}
+.crm-layout #main-content :is(.card,.cc-panel,.mc-connection,.mc-wizard,.mc-guide)>header{background:transparent;color:inherit;border-color:var(--form-border)}
+.crm-layout #main-content form fieldset legend{max-width:100%;white-space:normal;line-height:1.6}
+.crm-layout #main-content form input[type=file]::file-selector-button{background:var(--form-raised);color:var(--form-text);border:1px solid var(--form-border);border-radius:6px;padding:6px 10px;cursor:pointer}
+.crm-layout #main-content :is(dialog,.crm-detail-drawer,.mw-drawer,.master-form-drawer,.master-filter-sheet){color:var(--form-text)}
+html[data-theme=dark] .crm-layout #main-content form fieldset{background:var(--form-section);border-color:var(--form-border)!important}
+html[data-theme=dark] .crm-layout #main-content form :is(label,legend){color:var(--form-text)!important}
+html[data-theme=dark] .crm-layout #main-content form :is(.muted,.form-help,.form-field>small,.field-hint){color:var(--form-muted)!important}
+html[data-theme=dark] .crm-layout #main-content form :is(input,select,textarea){background:var(--form-field)!important;color:var(--form-text)!important;border-color:var(--form-border)!important}
+html[data-theme=dark] .crm-layout #main-content form :is(input,select,textarea):disabled,
+html[data-theme=dark] .crm-layout #main-content form :is(input,textarea)[readonly]{background:var(--form-disabled)!important;color:var(--form-muted)!important;opacity:1;cursor:default}
+html[data-theme=dark] .crm-layout #main-content form :is(input[type=checkbox],input[type=radio]){cursor:pointer}
+html[data-theme=dark] .crm-layout #main-content form :is(input[type=checkbox],input[type=radio]):disabled{cursor:not-allowed}
+html[data-theme=dark] .crm-layout #main-content :is(.card,.contact,.form-section,.cc-panel,.system-card,.system-details,.health-question,.ops-policy-rules>div){background:var(--form-surface);color:var(--form-text);border-color:var(--form-border)}
+html[data-theme=dark] .crm-layout #main-content :is(.card,.contact,.cc-panel,.system-card,.health-question)>header{background:var(--form-surface);color:var(--form-text);border-color:var(--form-border)}
+html[data-theme=dark] .crm-layout #main-content :is(.mc-wizard,.mc-connection,.mc-guide)>header{background:var(--form-surface);color:var(--form-text);border-color:var(--form-border)}
+html[data-theme=dark] .crm-layout #main-content :is(.filters,.table-card,.table-scroll,.crm-table-container){border-color:var(--form-border)}
+html[data-theme=dark] .crm-layout #main-content .filters{background:var(--form-surface);color:var(--form-text)}
+html[data-theme=dark] .crm-layout #main-content :is(.card,.contact,.form-section)>:is(h1,h2,h3,legend){color:var(--form-text)}
+html[data-theme=dark] .crm-layout #main-content :is(.back,.cc-tabs a,.master-navigation a,.mw-back-link){color:var(--form-accent)}
+html[data-theme=dark] .crm-layout #main-content form :is(.footer-actions,.filter-actions){border-color:var(--form-border)}
+html[data-theme=dark] .crm-layout #main-content :is(dialog,.master-guide,.master-form-drawer,.master-filter-sheet,.crm-filter-sheet,.crm-detail-drawer,.mw-drawer,.tracking-drawer){background:var(--form-surface)!important;color:var(--form-text)!important;border-color:var(--form-border)!important}
+html[data-theme=dark] .crm-layout #main-content :is(dialog,.master-form-drawer,.crm-detail-drawer,.mw-drawer,.tracking-drawer)>header{background:var(--form-surface);color:var(--form-text);border-color:var(--form-border)}
+html[data-theme=dark] .crm-layout #main-content dialog::backdrop{background:#020617b3}
+html[data-theme=dark] .crm-layout #main-content [role=listbox]{background:var(--form-surface);color:var(--form-text);border-color:var(--form-border)}
+html[data-theme=dark] .crm-layout #main-content [role=option]{color:var(--form-text);background:transparent}
+html[data-theme=dark] .crm-layout #main-content [role=option][aria-selected=true]{background:#24436b;color:#dceaff}
+html[data-theme=dark] .crm-layout #main-content :is([role=option]:hover,[role=option]:focus-visible){background:var(--form-raised);color:var(--form-text)}
+html[data-theme=dark] .crm-layout #main-content button:disabled{background:var(--form-disabled)!important;color:var(--form-muted)!important;border-color:var(--form-border)!important;opacity:1;cursor:not-allowed}
+html[data-theme=dark] .crm-layout #main-content :is(code,pre){background:var(--form-field);color:#c7dfff;border-color:var(--form-border);overflow-wrap:anywhere}
+html[data-theme=dark] .crm-layout #main-content .ops-calendar .ops-calendar-holiday{background:#492633!important;color:#ffd0da!important}
+html[data-theme=dark] .crm-layout #main-content :is(progress,meter){accent-color:#87b9ff}
+@media(max-width:767px){
+    .crm-layout #main-content :is(.heading,.footer-actions){gap:12px;flex-wrap:wrap}
+    .crm-layout #main-content .heading>div{min-width:0;max-width:100%}
+    .crm-layout:not(:has(#builder-form)) #main-content form :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea){font-size:16px!important}
+    .crm-layout #main-content .card>form>.actions{flex-wrap:wrap}
+    .crm-layout #main-content form .footer-actions :is(button,.button){min-height:44px}
+    .crm-layout #main-content :is(.filters,.grid)>*{min-width:0;max-width:100%}
+}
+html[data-theme=dark] .crm-layout #main-content form :is(input,select,textarea)[aria-invalid=true]{border-color:var(--form-error)!important;outline-color:var(--form-error)}
+html[data-theme=dark] .crm-layout #main-content form :is(input,textarea):-webkit-autofill{box-shadow:0 0 0 1000px var(--form-field) inset!important;-webkit-text-fill-color:var(--form-text)!important;caret-color:var(--form-text)}
+/* Process Cockpit uses the same filter sizes as the other workspaces. */
+.crm-layout #main-content #process-cockpit .process-filters :is(input,select):not([type=hidden]){height:42px!important;min-height:42px!important;padding:9px 12px!important;font-size:14px!important;line-height:22px!important}
+.crm-layout #main-content #process-cockpit .process-filter-actions :is(button,.button){min-height:42px;padding:9px 12px}
+@media(max-width:767px){
+    .crm-layout #main-content #process-cockpit .process-filters :is(input,select):not([type=hidden]){height:44px!important;min-height:44px!important;font-size:16px!important}
+    .crm-layout #main-content #process-cockpit .process-filter-actions :is(button,.button){min-height:44px}
+}

@@ -1,0 +1,1 @@
+<div class="cockpit-metrics">@foreach($stats as $metric)<section class="card cockpit-metric"><span class="metric-icon"><x-ui-icon :name="$metric['icon']"/></span><span>{{ $metric['label'] }}</span><strong>{{ $metric['value'] }}</strong><small>{{ $metric['hint'] }}</small>@if($metric['url'])<a href="{{ $metric['url'] }}">Lihat detail →</a>@endif</section>@endforeach</div>

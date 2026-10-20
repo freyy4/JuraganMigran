@@ -1,0 +1,10 @@
+@extends('layouts.candidates')
+@section('title', $flight->exists ? 'Edit Jadwal Penerbangan' : 'Tambah Jadwal Penerbangan')
+@section('content')
+<a class="back" href="{{ route('flights.index') }}">← Jadwal penerbangan</a><div class="heading"><div><h1>{{ $flight->exists ? 'Edit' : 'Tambah' }} Jadwal Penerbangan</h1><p class="muted">Seluruh waktu menggunakan WIB. Kolom bertanda * wajib diisi.</p></div></div>
+<form method="post" action="{{ $flight->exists ? route('flights.update',$flight) : route('flights.store') }}">@csrf @if($flight->exists) @method('PUT') @endif<section class="card"><div class="grid"><div class="full"><label for="application_id">Lamaran / CPMI <span class="required">*</span></label><select name="application_id" id="application_id" required><option value="">Pilih lamaran</option>@foreach($applications as $application)<option value="{{ $application->id }}" @selected((string)old('application_id',$flight->application_id) === (string)$application->id)>{{ $application->application_code }} · {{ $application->candidate?->person?->full_name }} · {{ $application->vacancy?->title }}</option>@endforeach</select></div>
+@foreach(['airline'=>'Maskapai','flight_number'=>'Nomor penerbangan','departure_airport'=>'Bandara asal','arrival_airport'=>'Bandara tujuan'] as $field=>$label)<x-candidate-field :name="$field" :label="$label" :value="$flight->{$field}" required maxlength="255" />@endforeach
+<x-candidate-field name="departure_at" label="Waktu berangkat (WIB)" type="datetime-local" :value="$flight->departure_at?->copy()->setTimezone(\App\Models\FlightDetail::TIMEZONE)->format('Y-m-d\TH:i')" required />
+<x-candidate-field name="arrival_at" label="Waktu tiba (WIB)" type="datetime-local" :value="$flight->arrival_at?->copy()->setTimezone(\App\Models\FlightDetail::TIMEZONE)->format('Y-m-d\TH:i')" required />
+</div></section><div class="actions footer-actions"><button type="submit">Simpan Penerbangan</button><a class="button secondary" href="{{ route('flights.index') }}">Batal</a></div></form>
+@endsection

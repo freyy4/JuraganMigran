@@ -1,0 +1,39 @@
+# Run a dedicated WAHA runtime. The session path must be on an encrypted host volume.
+# Supply a reviewed, pinned image tag/digest; keep the API reachable only on loopback.
+services:
+  whatsapp-qr:
+    image: ${WHATSAPP_QR_IMAGE:?Set a pinned WAHA image digest}
+    restart: unless-stopped
+    mem_limit: 1536m
+    memswap_limit: 2560m
+    mem_reservation: 256m
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      WAHA_API_KEY: ${WHATSAPP_QR_GATEWAY_KEY:?Set a server-only API key}
+      WAHA_PRINT_QR: "False"
+      WAHA_LOG_LEVEL: "warn"
+      WAHA_BASE_URL: ${WHATSAPP_QR_GATEWAY_URL:-http://127.0.0.1:3001}
+      WHATSAPP_FILES_LIFETIME: "86400"
+      WAHA_DASHBOARD_ENABLED: "False"
+      WHATSAPP_SWAGGER_ENABLED: "False"
+      WHATSAPP_DEFAULT_ENGINE: "WEBJS"
+      WHATSAPP_RESTART_ALL_SESSIONS: "True"
+    volumes:
+      - type: bind
+        source: ${WHATSAPP_QR_ENCRYPTED_SESSION_PATH:?Set an encrypted session volume}
+        target: /app/.sessions
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    shm_size: "512mb"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"

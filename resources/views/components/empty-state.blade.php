@@ -1,0 +1,2 @@
+@props(['title'=>'Tidak ada data yang ditemukan.','filtered'=>false,'scoped'=>true,'reset'=>null,'detail'=>''])
+<div class="crm-empty"><x-ui-icon name="search"/><h3>{{ $title }}</h3><p class="muted">{{ $detail ?: ($filtered?'Tidak ada hasil yang cocok. Reset filter atau pilih periode lain.':($scoped?'Data baru dalam cakupan Anda akan tampil di sini.':'Akun ini belum memiliki data dalam scope yang diizinkan.')) }}</p>@if($reset)<a class="button secondary" href="{{ $reset }}" data-crm-reset>Reset Filter</a>@endif</div>

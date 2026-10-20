@@ -1,0 +1,1 @@
+<form method="post" action="{{ route('flights.destroy',$flight) }}" onsubmit="return confirm('Hapus jadwal penerbangan ini?')">@csrf @method('DELETE')<button type="submit" class="danger">Hapus</button></form>

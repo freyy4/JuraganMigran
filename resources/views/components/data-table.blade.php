@@ -1,0 +1,2 @@
+@props(['headers'=>[],'label'=>'Daftar data','selectable'=>false])
+<div class="crm-desktop-table"><table class="crm-data-table"><caption class="sr-only">{{ $label }}</caption><thead><tr>@if($selectable)<th scope="col"><input type="checkbox" data-crm-select-page aria-label="Pilih semua baris halaman ini"></th>@endif @foreach($headers as $heading)<th scope="col">{{ $heading }}</th>@endforeach</tr></thead><tbody>{{ $slot }}</tbody></table></div>

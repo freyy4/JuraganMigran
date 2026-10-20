@@ -1,0 +1,194 @@
+/* Shared admin form layout. Public registration and CPMI portal keep their own styles. */
+.crm-layout #main-content .filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+    align-items: end;
+    gap: 18px 16px;
+    margin-bottom: 24px;
+    padding: 20px 22px;
+}
+.crm-layout #main-content .filters:not(.card) { padding: 0; }
+.crm-layout #main-content .filters > * { min-width: 0; width: auto; }
+.crm-layout #main-content .filters .search,
+.crm-layout #main-content .filters .status { min-width: 0; }
+.crm-layout #main-content .filters:has(> .filter-actions:nth-of-type(2)) {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+.crm-layout #main-content .filter-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    align-self: end;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+}
+.crm-layout #main-content .filter-actions > :is(button, .button) {
+    min-height: 44px;
+    margin: 0;
+    padding: 10px 16px;
+    font-size: 14px;
+}
+.crm-layout #main-content .filters label { margin: 0 0 8px; line-height: 1.4; }
+.crm-layout #main-content .filters :is(input, select) {
+    height: 44px;
+    min-height: 44px;
+    margin: 0;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 14px;
+    line-height: 22px;
+    padding: 10px 12px;
+}
+.crm-layout #main-content input[type="hidden"] { display: none !important; }
+.crm-layout:not(:has(#builder-form)) #main-content form :is(input, select, textarea):not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="submit"]):not([type="button"]) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 22px;
+    border-radius: 9px;
+}
+.crm-layout:not(:has(#builder-form)) #main-content form textarea { min-height: 112px; resize: vertical; }
+.crm-layout:not(:has(#builder-form)) #main-content form textarea[rows] { min-height: 80px; }
+.crm-layout:not(:has(#builder-form)) #main-content form label {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--jm-text, #334155);
+    margin-bottom: 8px;
+    overflow-wrap: anywhere;
+}
+.crm-layout:not(:has(#builder-form)) #main-content form .grid {
+    gap: 20px 24px;
+    align-items: start;
+}
+.crm-layout #main-content form .grid > * { min-width: 0; }
+.crm-layout #main-content form .grid > button { grid-column: 1 / -1; justify-self: end; }
+.crm-layout #main-content form .form-field + .form-field { margin-top: 18px; }
+.crm-layout #main-content form :is(.grid, .filters) > .form-field { margin-top: 0; }
+.crm-layout #main-content form > .form-field + button { margin-top: 18px; }
+.crm-layout #main-content form :is(.card, .contact) > :is(input, select, textarea) + label,
+.crm-layout #main-content form > :is(input, select, textarea):not([type="hidden"]) + label { margin-top: 18px; }
+.crm-layout #main-content form .field-error { margin: 6px 0 0; font-size: 12px; line-height: 1.5; }
+.crm-layout #main-content form .form-field > .muted,
+.crm-layout #main-content form .grid > div > .muted { margin: 7px 0 0; font-size: 12px; }
+.crm-layout #main-content form .check,
+.crm-layout #main-content form .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 32px;
+    padding: 5px 0;
+    margin: 0;
+    font-weight: 500;
+}
+.crm-layout #main-content form :is(input[type="checkbox"], input[type="radio"]) {
+    width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 2px 0 0;
+    accent-color: #2563eb;
+    flex-shrink: 0;
+}
+.crm-layout #main-content form fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 18px 20px;
+    border: 1px solid var(--jm-border, #e2e8f0);
+    border-radius: 10px;
+    background: var(--form-section, #fbfcfe);
+}
+.crm-layout #main-content form legend {
+    padding: 0 8px;
+    color: var(--jm-text, #334155);
+    font-size: 14px;
+    font-weight: 650;
+}
+.crm-layout #main-content form fieldset > .muted { margin: 0 0 16px; font-size: 13px; }
+.crm-layout #main-content form .permission-choice { display: inline-flex; margin: 5px 16px 5px 0; }
+.crm-layout #main-content form .footer-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 24px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--jm-border, #e2e8f0);
+}
+.crm-layout #main-content form .footer-actions > :is(button, .button) { min-width: 120px; }
+.crm-layout #main-content form .grid > .actions.full { padding-top: 8px; }
+.crm-layout #main-content form input[type="file"] { height: auto; overflow: hidden; }
+.crm-layout #main-content form input[type="file"]::file-selector-button {
+    margin-right: 12px;
+    padding: 5px 10px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    color: var(--jm-text, #334155);
+    background: var(--form-raised, #eff4fb);
+    cursor: pointer;
+}
+.crm-layout #main-content .task-tabs {
+    gap: 8px;
+    padding-bottom: 6px;
+    margin-bottom: 22px;
+}
+.crm-layout #main-content .task-tabs > .button {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 13px;
+    white-space: normal;
+    text-align: center;
+}
+.crm-layout #main-content td:has(form :is(input, select, textarea)) { white-space: normal; }
+.crm-layout #main-content :is(input, textarea)::placeholder { color: #94a3b8; opacity: 1; }
+@media (max-width: 767px) {
+    .crm-layout #main-content .filters,
+    .crm-layout #main-content .filters:has(> .filter-actions:nth-of-type(2)) { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 18px; }
+    .crm-layout #main-content .filters:not(.card) { padding: 0; }
+    .crm-layout #main-content .filter-actions { display: flex; flex-wrap: nowrap; width: 100%; gap: 10px; }
+    .crm-layout #main-content .filter-actions > :is(button, .button) { flex: 1; min-width: 0; white-space: normal; text-align: center; }
+    .crm-layout:not(:has(#builder-form)) #main-content form .grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .crm-layout #main-content form .grid > .full { grid-column: 1 / -1; }
+    .crm-layout #main-content form .grid > button { width: 100%; }
+    .crm-layout #main-content form fieldset { padding: 14px 16px; }
+    .crm-layout #main-content form .footer-actions > :is(button, .button) { flex: 1 1 120px; min-width: 0; white-space: normal; text-align: center; }
+    .crm-layout #main-content form :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { font-size: 16px !important; }
+}
+
+.crm-layout #main-content .live-search-status{font-size:13px;margin:8px 0 16px;min-height:20px}.crm-layout #main-content [data-live-results][aria-busy=true]{opacity:.65;cursor:progress}
+.health-question{padding:18px;margin:16px 0;border:1px solid var(--jm-border,#dce5ef);border-radius:12px;min-width:0}.health-question legend{font-weight:600;padding:0 6px;max-width:100%;white-space:normal}.health-options{display:flex;gap:10px;flex-wrap:wrap}.health-options .check,.health-choice{min-height:44px;padding:10px 12px;border:1px solid var(--jm-border,#dce5ef);border-radius:8px}.document-review-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px}.document-review-preview{width:100%;height:65vh;min-height:320px;border:1px solid var(--jm-border,#dce5ef);border-radius:12px;background:var(--jm-surface,#fff)}.document-review-image{max-width:100%;height:auto}.document-action-queue{margin-bottom:24px}.document-action-queue .contact{margin:12px 0}[data-health-detail][hidden]{display:none!important}@media(max-width:767px){.document-review-layout{grid-template-columns:1fr}.document-review-preview{height:45vh}.health-options .check{flex:1 1 100px}.requirement-config .heading{align-items:flex-start;flex-wrap:wrap}}
+
+/* Consistent field rhythm for standard CRM forms, including new modules. */
+.crm-layout:not(:has(#builder-form)) #main-content form label:has(> :is(input, select, textarea)):not(:has(input[type="checkbox"], input[type="radio"])) { margin-bottom: 0; }
+.crm-layout:not(:has(#builder-form)) #main-content form label > :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { margin-top: 8px; font-weight: 400; }
+.crm-layout:not(:has(#builder-form)) #main-content form > label:has(> :is(input, select, textarea)) + label { margin-top: 18px; }
+.crm-layout:not(:has(#builder-form)) #main-content form label:has(> :is(input[type="checkbox"], input[type="radio"])) { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
+.crm-layout #main-content .filters > :is(button, .button),
+.crm-layout #main-content .filters .filter-actions { min-height: 44px; align-self: end; }
+.crm-layout #main-content .filters > :is(button, .button) { margin: 0; }
+.crm-layout #main-content .filters > label.check { align-self: center; }
+.crm-layout:not(:has(#builder-form)) #main-content details > form { margin-top: 20px; }
+.crm-layout:not(:has(#builder-form)) #main-content form details > :is(input, select, textarea) + label { margin-top: 18px; }
+.crm-layout:not(:has(#builder-form)) #main-content form > :is(input, select, textarea):not([type="hidden"]) + button,
+.crm-layout:not(:has(#builder-form)) #main-content form > label + button { margin-top: 18px; }
+.crm-layout #main-content .actions > form:has(> select) { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.crm-layout #main-content .actions > form:has(> select) > select { width: auto; flex: 1 1 170px; }
+.crm-layout #main-content form .grid > :is(.footer-actions, .filter-actions) { grid-column: 1 / -1; }
+.crm-layout #main-content form .grid > .footer-actions { margin-top: 0; }
+.crm-layout #main-content form .grid > label.check { align-self: start; }
+.crm-layout #main-content :is(.grid, .filters) > div > label { max-width: 100%; }
+.crm-layout #main-content form input[type="file"] { padding: 8px; }
+@media (max-width: 767px) {
+    .crm-layout #main-content .filters .filter-actions { flex-wrap: wrap; }
+    .crm-layout #main-content .filter-actions > :is(button, .button) { flex: 1 1 110px; }
+    .crm-layout #main-content .actions > form:has(> select) { width: 100%; }
+    .crm-layout #main-content .actions > form:has(> select) > :is(button, select) { flex: 1 1 100%; width: 100%; }
+    .crm-layout #main-content form .footer-actions { justify-content: stretch; }
+}
+.crm-layout:not(:has(#builder-form)) #main-content form :is(.grid, fieldset, textarea) + h2 { margin-top: 24px; }

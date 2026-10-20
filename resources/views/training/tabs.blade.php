@@ -1,0 +1,1 @@
+<div class="actions footer-actions"><a class="button {{ request()->routeIs('training.*') ? '' : 'secondary' }}" href="{{ route('training.index') }}">Peserta</a><a class="button {{ request()->routeIs('training-batches.*') ? '' : 'secondary' }}" href="{{ route('training-batches.index') }}">Angkatan</a></div>

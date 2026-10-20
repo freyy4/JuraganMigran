@@ -1,0 +1,11 @@
+@extends('layouts.candidates')
+@section('title', 'Lowongan')
+@section('content')
+<div class="heading"><div><h1>Lowongan</h1><p class="muted">Kelola lowongan dan persyaratan calon pekerja.</p></div><a class="button" href="{{ route('vacancies.create') }}">+ Tambah Lowongan</a></div>
+<form class="card filters" method="get" action="{{ route('vacancies.index') }}"><div class="search"><label for="search">Cari lowongan</label><input id="search" name="search" maxlength="255" value="{{ request('search') }}" placeholder="Kode, lowongan, posisi, atau mitra"></div><div><label for="status">Status</label><select id="status" name="status"><option value="">Semua status</option>@foreach($statuses as $status)<option value="{{ $status }}" @selected(request('status') === $status)>{{ \App\Models\Company::statusLabel($status) }}</option>@endforeach</select></div>
+<div class="filter-actions"><button type="submit">Terapkan</button><a class="button secondary" href="{{ route('vacancies.index') }}">Reset</a></div>
+</form>
+<div class="card table-card"><div class="table-scroll"><table><caption class="sr-only">Daftar lowongan</caption><thead><tr>@foreach(['Kode','Lowongan','Posisi','Mitra','Negara','Kuota','Gaji','Status','Aksi'] as $label)<th scope="col">{{ $label }}</th>@endforeach</tr></thead><tbody>
+@forelse($vacancies as $vacancy)<tr><td><a href="{{ route('vacancies.show',$vacancy) }}">{{ $vacancy->code }}</a></td><td><strong>{{ $vacancy->title }}</strong></td><td>{{ $vacancy->position_name }}</td><td>{{ $vacancy->jobOrder?->company?->name ?? '—' }}</td><td>{{ $vacancy->jobOrder?->country?->name ?? '—' }}</td><td>{{ number_format($vacancy->quota,0,',','.') }}</td><td>{{ $vacancy->salary !== null ? $vacancy->currency.' '.number_format((float)$vacancy->salary,2,',','.') : '—' }}</td><td><span class="badge">{{ \App\Models\Company::statusLabel($vacancy->status) }}</span></td><td><div class="actions"><a href="{{ route('vacancies.show',$vacancy) }}">Detail</a><a href="{{ route('vacancies.edit',$vacancy) }}">Edit</a>@include('vacancies.delete')</div></td></tr>@empty<tr><td colspan="9" class="empty">Tidak ada lowongan yang ditemukan.</td></tr>@endforelse
+</tbody></table></div><x-crm-pagination :rows="$vacancies" label="lowongan" /></div>
+@endsection

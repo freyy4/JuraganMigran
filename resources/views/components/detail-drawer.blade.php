@@ -1,0 +1,1 @@
+<dialog class="crm-detail-drawer" data-crm-detail-drawer aria-label="Detail CRM"><header><h2>Detail</h2><button type="button" class="secondary crm-icon-button" data-crm-drawer-close aria-label="Tutup detail">×</button></header><div data-crm-drawer-body></div></dialog>

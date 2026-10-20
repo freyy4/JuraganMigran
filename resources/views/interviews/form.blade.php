@@ -1,0 +1,11 @@
+@extends('layouts.candidates')
+@section('title', $interview->exists ? 'Edit Jadwal Wawancara' : 'Jadwalkan Wawancara')
+@section('content')
+<a class="back" href="{{ route('interviews.index') }}">← Daftar wawancara</a><div class="heading"><div><h1>{{ $interview->exists ? 'Edit Jadwal Wawancara' : 'Jadwalkan Wawancara' }}</h1><p class="muted">Jadwal menggunakan WIB. Kolom bertanda * wajib diisi.</p></div></div>
+<form method="post" action="{{ $interview->exists ? route('interviews.update',$interview) : route('interviews.store') }}">@csrf @if($interview->exists) @method('PUT') @endif<input type="hidden" name="type" value="{{ $interview->type ?? 'general' }}">
+<section class="card"><div class="grid"><div><label for="application_id">Lamaran <span class="required">*</span></label><select id="application_id" name="application_id" required>@if(!$interview->exists)<option value="">Pilih lamaran</option>@endif @foreach($applications as $application)@if(!$interview->exists || $interview->application_id === $application->id)<option value="{{ $application->id }}" @selected((string)old('application_id',$interview->application_id) === (string)$application->id)>{{ $application->application_code }} · {{ $application->candidate?->person?->full_name }} · {{ $application->vacancy?->title }}</option>@endif @endforeach</select></div>
+<x-candidate-field name="scheduled_at" label="Jadwal (WIB)" type="datetime-local" :value="$interview->scheduled_at?->copy()->setTimezone(\App\Models\Interview::TIMEZONE)->format('Y-m-d\TH:i')" required />
+<div><label for="interviewer_id">Pewawancara</label><select id="interviewer_id" name="interviewer_id"><option value="">Belum ditugaskan</option>@foreach($users as $user)<option value="{{ $user->id }}" @selected((string)old('interviewer_id',$interview->interviewer_id) === (string)$user->id)>{{ $user->name }} · {{ $user->email }}</option>@endforeach</select></div>
+<x-candidate-field name="meeting_link" label="Tautan pertemuan" type="url" :value="$interview->meeting_link" maxlength="5000" />
+</div></section><div class="actions footer-actions"><button type="submit">Simpan Jadwal</button><a class="button secondary" href="{{ route('interviews.index') }}">Batal</a></div></form>
+@endsection
