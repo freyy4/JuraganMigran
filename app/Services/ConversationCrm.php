@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ConversationCrm
@@ -42,43 +41,14 @@ class ConversationCrm
 
     public function activity(int $lead, string $type, string $summary, ?int $actor = null): void
     {
+        DB::table('acquisition_leads')->where('id', $lead)->update(['updated_at' => now()]);
         DB::table('crm_activities')->insert(['lead_id' => $lead, 'actor_id' => $actor, 'event_type' => $type, 'summary' => $summary, 'created_at' => now()]);
         app(AccessPolicy::class)->audit($actor ? User::find($actor) : null, 'crm.'.$type, ['lead_id' => $lead]);
     }
 
     public function owner(object $channel, object $lead): ?int
     {
-        $eligible = User::where('is_active', true)->when($channel->team_id, fn ($q) => $q->where('team_id', $channel->team_id))->orderBy('id')->get()->filter(fn (User $u) => $u->hasPermission('crm.conversation.reply'));
-        if ($channel->prefer_existing_owner && $lead->assigned_cs_id) {
-            $existing = app(AssignmentPolicy::class)->existingOwner($lead->assigned_cs_id, true);
-            if ($existing) {
-                return $existing->id;
-            }
-        }
-        $hours = json_decode($channel->business_hours ?? 'null', true);
-        if ($hours) {
-            $local = now()->timezone('Asia/Jakarta');
-            if (! in_array($local->dayOfWeekIso, $hours['days'] ?? [1, 2, 3, 4, 5], true) || $local->format('H:i') < $hours['start'] || $local->format('H:i') >= $hours['end']) {
-                return null;
-            }
-        }
-        $profiles = DB::table('crm_agent_profiles')->whereIn('user_id', $eligible->pluck('id'))->get()->keyBy('user_id');
-        $counts = DB::table('crm_conversations')->where('status', 'OPEN')->whereIn('assigned_user_id', $eligible->pluck('id'))->groupBy('assigned_user_id')->selectRaw('assigned_user_id, COUNT(*) AS total')->pluck('total', 'assigned_user_id');
-        $eligible = $eligible->filter(fn ($u) => ($profiles[$u->id]->availability ?? 'ONLINE') === 'ONLINE' && ($counts[$u->id] ?? 0) < ($profiles[$u->id]->conversation_cap ?? 30));
-        if ($channel->routing_method === 'MANUAL') {
-            return null;
-        }
-        if ($channel->routing_method === 'LEAST_ACTIVE') {
-            $counts = DB::table('crm_conversations')->where('status', 'OPEN')->whereIn('assigned_user_id', $eligible->pluck('id'))->groupBy('assigned_user_id')->selectRaw('assigned_user_id, COUNT(*) AS total')->pluck('total', 'assigned_user_id');
-
-            return $eligible->sortBy(fn ($u) => $counts[$u->id] ?? 0)->first()?->id;
-        }
-        $user = $eligible->first(fn ($u) => $u->id > ($channel->last_user_id ?? 0)) ?? $eligible->first();
-        if ($user) {
-            DB::table('whatsapp_channels')->where('id', $channel->id)->update(['last_user_id' => $user->id]);
-        }
-
-        return $user?->id;
+        return app(AssignmentPolicy::class)->conversationOwner($channel, $lead);
     }
 
     public function ingest(array $payload): void
@@ -87,6 +57,11 @@ class ConversationCrm
     }
 
     public function ingestNormalized(array $events): void
+    {
+        DB::transaction(fn () => $this->ingestEvents($events), 3);
+    }
+
+    private function ingestEvents(array $events): void
     {
         foreach ($events as $event) {
             $channel = DB::table('whatsapp_channels')->where('id', $event['channel_id'])->where('provider', $event['provider'])->where('is_active', true)->lockForUpdate()->first();
@@ -113,12 +88,8 @@ class ConversationCrm
             return;
         }
         $phone = CsRouter::phone($message['from']);
-        $lead = DB::table('acquisition_leads')->where('normalized_phone', $phone)->lockForUpdate()->first();
-        if (! $lead) {
-            $id = DB::table('acquisition_leads')->insertGetId(['public_token' => (string) Str::uuid(), 'name' => mb_substr($message['name'] ?? $phone, 0, 255), 'normalized_phone' => $phone, 'crm_source' => 'WhatsApp', 'crm_stage_entered_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
-            $lead = DB::table('acquisition_leads')->find($id);
-            $this->activity($id, 'lead_created', 'Lead masuk melalui WhatsApp.');
-        }
+        $lead = app(LeadUpsertService::class)->upsert(mb_substr($message['name'] ?? $phone, 0, 255), $message['from'], null, 'WhatsApp');
+        app(AttributionService::class)->record($lead->id, 'inbound-'.$channel->id.'-'.hash('sha256', $message['id']), 'WHATSAPP_INBOUND', 'WhatsApp', [], Carbon::createFromTimestampUTC((int) $message['timestamp'])->toDateTimeString());
         $conversation = DB::table('crm_conversations')->where('channel_id', $channel->id)->where('wa_contact_id', ltrim($phone, '+'))->lockForUpdate()->first();
         if (! $conversation) {
             $owner = $this->owner($channel, $lead);
@@ -183,6 +154,7 @@ class ConversationCrm
 
     public function move(Request $request, int $lead, string $stage, ?string $reason, int $version): void
     {
+        abort_if($stage === 'CONVERTED', 422, 'Gunakan review konversi Candidate/Lamaran untuk tahap Dikonversi.');
         $this->leads($request, 'crm.pipeline.move')->whereNull('archived_at')->where('id', $lead)->first() ?? abort(404);
         DB::transaction(function () use ($request, $lead, $stage, $reason, $version): void {
             $row = DB::table('acquisition_leads')->where('id', $lead)->lockForUpdate()->first();

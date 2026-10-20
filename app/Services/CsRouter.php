@@ -9,8 +9,11 @@ class CsRouter
 {
     public static function phone(string $phone): string
     {
+        if (! preg_match('/^[+0-9\s().-]+$/', $phone)) {
+            throw ValidationException::withMessages(['whatsapp' => 'Nomor WhatsApp hanya boleh memuat angka dan pemisah nomor.']);
+        }
         $phone = preg_replace('/[^0-9]/', '', $phone);
-        if (str_starts_with($phone, '0')) {
+        if (str_starts_with($phone, '08')) {
             $phone = '62'.substr($phone, 1);
         }
         if (! preg_match('/^[1-9][0-9]{8,14}$/', $phone)) {
@@ -30,35 +33,7 @@ class CsRouter
 
     public function assign(int $leadId, int $vacancyId, ?int $submissionId = null): ?object
     {
-        return DB::transaction(function () use ($leadId, $vacancyId, $submissionId): ?object {
-            $lead = DB::table('acquisition_leads')->where('id', $leadId)->lockForUpdate()->first();
-            app(AssignmentPolicy::class)->syncUnassignedConversations($leadId, $lead->assigned_cs_id);
-            if ($lead->assigned_member_id) {
-                return DB::table('cs_members')->find($lead->assigned_member_id);
-            }
-            if ($lead->assigned_cs_id) {
-                $owner = DB::table('cs_members')->where('user_id', $lead->assigned_cs_id)->where('is_active', true)->first();
-                if ($owner) {
-                    DB::table('acquisition_leads')->where('id', $leadId)->update(['assigned_member_id' => $owner->id]);
-                }
-
-                return $owner;
-            }
-            $mapping = DB::table('cs_vacancy_mappings')->where('vacancy_id', $vacancyId)->first();
-            $group = $mapping ? DB::table('cs_groups')->where('id', $mapping->group_id)->where('is_active', true)->lockForUpdate()->first() : null;
-            $members = $group ? DB::table('cs_members')->where('group_id', $group->id)->where('is_active', true)->where(fn ($q) => $q->whereNull('user_id')->orWhereIn('user_id', app(AssignmentPolicy::class)->activeUserIds()))->orderBy('id')->get() : collect();
-            $member = $members->first(fn ($member) => $member->id > ($group->last_member_id ?? 0)) ?? $members->first();
-            if ($member) {
-                DB::table('acquisition_leads')->where('id', $leadId)->update(['assigned_member_id' => $member->id, 'assigned_cs_id' => $member->user_id, 'updated_at' => now()]);
-                DB::table('cs_groups')->where('id', $group->id)->update(['last_member_id' => $member->id, 'updated_at' => now()]);
-                DB::table('cs_members')->where('id', $member->id)->update(['last_assigned_at' => now()]);
-                app(AssignmentPolicy::class)->syncUnassignedConversations($leadId, $member->user_id);
-            }
-            DB::table('cs_assignment_events')->insert(['lead_id' => $leadId, 'member_id' => $member?->id, 'submission_id' => $submissionId, 'status' => $member ? 'assigned' : ($mapping ? 'no_active_cs' : 'unmapped_vacancy'), 'created_at' => now(), 'updated_at' => now()]);
-            app(AccessPolicy::class)->audit(auth()->user(), 'cs.assignment', ['lead_id' => $leadId, 'member_id' => $member?->id, 'status' => $member ? 'assigned' : 'queued']);
-
-            return $member;
-        });
+        return app(AssignmentPolicy::class)->assignForm($leadId, $vacancyId, $submissionId);
     }
 
     public function message(object $lead, object $vacancy, ?object $member, ?int $templateId = null, ?object $submission = null): string

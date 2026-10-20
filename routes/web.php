@@ -11,6 +11,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ConversationCrmController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\CrmBulkController;
+use App\Http\Controllers\CrmIdentityController;
 use App\Http\Controllers\CrmPipelineWorkspaceController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DocumentCustodyController;
@@ -89,6 +90,7 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     Route::post('settings/crm/whatsapp/connect/callback', [ConversationCrmController::class, 'connectCallback'])->name('crm.connect-callback');
     Route::post('crm/availability', [ConversationCrmController::class, 'availability'])->name('crm.availability');
     Route::get('crm/conversations/{conversation}/messages/{message}/attachment', [ConversationCrmController::class, 'attachment'])->whereNumber(['conversation', 'message'])->middleware('throttle:20,1')->name('crm.attachment');
+    Route::post('settings/crm/stages', [ConversationCrmController::class, 'createStage'])->name('crm.create-stage');
     Route::post('settings/crm/stages/{stage}', [ConversationCrmController::class, 'saveStage'])->whereNumber('stage')->name('crm.save-stage');
     Route::post('settings/crm/channels/{channel}/register', [ConversationCrmController::class, 'registerChannel'])->whereNumber('channel')->middleware('throttle:5,1')->name('crm.register-channel');
     Route::prefix('api/whatsapp')->name('whatsapp-qr.')->group(function (): void {
@@ -120,10 +122,18 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     Route::get('api/integrations/whatsapp/{channel}/tests', [MetaConnectController::class, 'tests'])->whereNumber('channel')->name('meta-connect.tests');
     Route::get('crm/inbox', [ConversationCrmController::class, 'inbox'])->name('crm.inbox');
     Route::get('api/crm/conversations', [ConversationCrmController::class, 'inbox'])->name('crm.api-inbox');
+    Route::post('api/crm/pipeline/export-preview', [CrmPipelineWorkspaceController::class, 'previewExport'])->name('crm.export-preview');
+    Route::post('api/crm/pipeline/stages/order', [CrmPipelineWorkspaceController::class, 'reorder'])->name('crm.reorder-stages');
     Route::post('api/crm/pipeline/bulk', [CrmPipelineWorkspaceController::class, 'bulk'])->middleware('throttle:20,1')->name('crm.bulk');
     Route::get('api/crm/pipeline/exports/{job}/download', [CrmPipelineWorkspaceController::class, 'download'])->whereUuid('job')->name('crm.export-download');
     Route::get('api/crm/pipeline/jobs/{job}', [CrmPipelineWorkspaceController::class, 'job'])->whereUuid('job')->name('crm.bulk-job');
     Route::match(['get', 'put'], 'api/crm/card-layout', [CrmPipelineWorkspaceController::class, 'layout'])->name('crm.card-layout');
+    Route::get('crm/campaign-attribution', [CrmIdentityController::class, 'campaign'])->name('crm.campaign-attribution');
+    Route::post('crm/leads/import', [CrmIdentityController::class, 'import'])->middleware('throttle:5,1')->name('crm.import');
+    Route::get('crm/duplicates', [CrmIdentityController::class, 'index'])->name('crm.duplicates');
+    Route::get('crm/duplicates/{duplicate}', [CrmIdentityController::class, 'compare'])->whereNumber('duplicate')->name('crm.duplicate-compare');
+    Route::post('crm/duplicates/{duplicate}', [CrmIdentityController::class, 'resolve'])->whereNumber('duplicate')->name('crm.duplicate-resolve');
+    Route::get('crm/leads/{lead}/attribution', [CrmIdentityController::class, 'attribution'])->whereNumber('lead')->name('crm.attribution');
     Route::get('crm/pipeline', [ConversationCrmController::class, 'pipeline'])->name('crm.pipeline');
     Route::get('crm/follow-up', [ConversationCrmController::class, 'followUps'])->name('crm.followups');
     Route::get('crm/leads/{lead}', [ConversationCrmController::class, 'profile'])->whereNumber('lead')->name('crm.profile');

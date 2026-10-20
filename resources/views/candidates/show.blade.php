@@ -24,6 +24,7 @@
 @if(auth()->user()->hasPermission('candidate.read.timeline'))
 <section class="card"><h2>Perjalanan & Libur</h2>@forelse($mobilityTimeline as $case)<p>{{ $case->created_at }} · {{ config('operations.purposes.'.$case->purpose) }} · {{ config('operations.statuses.'.$case->status,$case->status) }} @if(auth()->user()->hasPermission('mobility.read'))<a href="{{ route('mobility.show',$case->id) }}">{{ $case->code }}</a>@endif</p>@empty<p>Belum ada catatan perjalanan.</p>@endforelse</section>
 @endif
+@if(auth()->user()->hasPermission('candidate.read.timeline'))<section class="card"><h2>Histori CRM sebelum dan sesudah konversi</h2>@foreach($crmLeads as $crmLead)<p>#JM-{{ $crmLead->id }} · {{ $crmLead->crm_source ?: 'UNKNOWN' }}@if(auth()->user()->hasPermission('crm.lead.read')) · <a href="{{ route('crm.profile',$crmLead->id) }}">Buka percakapan, attribution, dan timeline CRM →</a>@endif</p>@endforeach @forelse($crmTimeline as $entry)<p>{{ $entry->created_at }} · {{ str_replace('_',' ',$entry->event_type) }} · {{ $entry->summary }}</p>@empty<p>Belum ada histori CRM terkait dalam cakupan akses Anda.</p>@endforelse</section>@endif
 <section class="card"><h2>Timeline proses</h2>
 @foreach($followups as $event)<p>{{ $event->created_at }} · WhatsApp: {{ $event->status }}</p>@endforeach
 @forelse($candidate->applications as $application)<p><a href="{{ route('applications.show',$application) }}">{{ $application->application_code }}</a> · {{ $application->status }}</p>@empty<p class="muted">Belum ada lamaran.</p>@endforelse</section>

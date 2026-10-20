@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Application;
-use App\Models\Candidate;
-use App\Models\Person;
 use App\Models\User;
 use App\Services\AccessPolicy;
+use App\Services\AttributionService;
 use App\Services\ConversationCrm;
+use App\Services\ConversionService;
 use App\Services\CrmLeadQuery;
 use App\Services\CsRouter;
 use App\Services\DocumentScanner;
+use App\Services\LeadUpsertService;
 use App\Services\WhatsAppCloud;
 use App\Services\WhatsAppQrGateway;
 use Illuminate\Http\JsonResponse;
@@ -47,7 +47,7 @@ class ConversationCrmController extends Controller
             default => null,
         };
         $query->when($filters['channel'] ?? null, fn ($q, $id) => $q->where('channel_id', $id));
-        $conversations = $query->select('crm_conversations.*', 'lead.name', 'lead.crm_stage', 'lead.next_followup_at', 'owner.name as owner_name', 'channel.provider as channel_provider', 'channel.name as channel_name')->selectSub(DB::table('crm_messages')->whereColumn('conversation_id', 'crm_conversations.id')->orderByDesc('provider_timestamp')->orderByDesc('id')->limit(1)->select('text'), 'preview')->orderByDesc('last_message_at')->orderByDesc('crm_conversations.id')->paginate(30)->withQueryString();
+        $conversations = $query->select('crm_conversations.*', 'lead.name', 'lead.crm_source', 'lead.crm_stage', 'lead.next_followup_at', 'owner.name as owner_name', 'channel.provider as channel_provider', 'channel.name as channel_name')->selectSub(DB::table('crm_messages')->whereColumn('conversation_id', 'crm_conversations.id')->orderByDesc('provider_timestamp')->orderByDesc('id')->limit(1)->select('text'), 'preview')->orderByDesc('last_message_at')->orderByDesc('crm_conversations.id')->paginate(30)->withQueryString();
         $selected = isset($filters['conversation']) ? $this->crm->conversations($request)->where('crm_conversations.id', $filters['conversation'])->first() : null;
         abort_if(isset($filters['conversation']) && ! $selected, 404);
         $messages = null;
@@ -93,7 +93,7 @@ class ConversationCrmController extends Controller
     {
         $tags = $lead ? DB::table('crm_tags')->join('crm_lead_tags', 'tag_id', '=', 'crm_tags.id')->where('lead_id', $lead->id)->select('crm_tags.*')->get() : collect();
 
-        return ['applications' => $lead?->candidate_id ? DB::table('applications')->leftJoin('pipeline_stages', 'pipeline_stages.id', '=', 'applications.current_stage_id')->whereIn('applications.id', app(AccessPolicy::class)->applicationIds($request->user(), 'candidate.read.basic'))->where('candidate_id', $lead->candidate_id)->select('applications.id', 'applications.application_code', 'applications.status', 'pipeline_stages.name as stage_name')->limit(30)->get() : collect(), 'lead' => $lead, 'tags' => $tags, 'allTags' => DB::table('crm_tags')->where('is_active', true)->limit(200)->get(), 'followUps' => $lead ? DB::table('crm_follow_ups')->where('lead_id', $lead->id)->orderBy('due_at')->limit(30)->get() : collect(), 'phone' => $lead && app(AcquisitionController::class)->scopedLeads($request, 'lead.read.contact')->where('id', $lead->id)->exists() ? $lead->normalized_phone : ($lead ? app(AccessPolicy::class)->mask($lead->normalized_phone) : ''), 'owners' => User::where('is_active', true)->when(! collect(app(AccessPolicy::class)->policies($request->user(), 'crm.lead.assign'))->contains('scope', 'OPERATIONAL_ALL'), fn ($q) => $q->where('team_id', $request->user()->team_id ?? -1))->get(['id', 'name', 'team_id'])->filter(fn ($u) => $u->hasPermission('crm.conversation.reply')), 'vacancies' => DB::table('vacancies')->whereIn('id', app(AccessPolicy::class)->vacancyIds($request->user(), 'lead.convert_to_candidate'))->orderBy('title')->limit(200)->get(['id', 'title'])];
+        return ['attribution' => $lead ? app(AttributionService::class)->summary($lead->id) : [], 'applications' => $lead?->candidate_id ? DB::table('applications')->leftJoin('pipeline_stages', 'pipeline_stages.id', '=', 'applications.current_stage_id')->whereIn('applications.id', app(AccessPolicy::class)->applicationIds($request->user(), 'candidate.read.basic'))->where('candidate_id', $lead->candidate_id)->select('applications.id', 'applications.application_code', 'applications.status', 'pipeline_stages.name as stage_name')->limit(30)->get() : collect(), 'lead' => $lead, 'tags' => $tags, 'allTags' => DB::table('crm_tags')->where('is_active', true)->limit(200)->get(), 'followUps' => $lead ? DB::table('crm_follow_ups')->where('lead_id', $lead->id)->orderBy('due_at')->limit(30)->get() : collect(), 'phone' => $lead && app(AcquisitionController::class)->scopedLeads($request, 'lead.read.contact')->where('id', $lead->id)->exists() ? $lead->normalized_phone : ($lead ? app(AccessPolicy::class)->mask($lead->normalized_phone) : ''), 'owners' => User::where('is_active', true)->when(! collect(app(AccessPolicy::class)->policies($request->user(), 'crm.lead.assign'))->contains('scope', 'OPERATIONAL_ALL'), fn ($q) => $q->where('team_id', $request->user()->team_id ?? -1))->get(['id', 'name', 'team_id'])->filter(fn ($u) => $u->hasPermission('crm.conversation.reply')), 'vacancies' => DB::table('vacancies')->whereIn('id', app(AccessPolicy::class)->vacancyIds($request->user(), 'lead.convert_to_candidate'))->orderBy('title')->limit(200)->get(['id', 'title'])];
     }
 
     public function read(Request $request, int $conversation): RedirectResponse
@@ -264,20 +264,34 @@ class ConversationCrmController extends Controller
         $visible = $request->input('mode') === 'list' ? $rows->getCollection() : collect($columns)->flatMap(fn ($column) => $column->items());
         $tagMap = DB::table('crm_lead_tags')->join('crm_tags', 'crm_tags.id', '=', 'tag_id')->whereIn('lead_id', $visible->pluck('id'))->get()->groupBy('lead_id');
         $ownerNames = DB::table('users')->whereIn('id', $visible->pluck('assigned_cs_id')->filter())->pluck('name', 'id');
+        $cardMessages = DB::table('crm_messages')->whereIn('conversation_id', $this->crm->conversations($request)->whereIn('lead_id', $visible->pluck('id'))->select('id'))->whereIn('crm_messages.id', DB::table('crm_messages')->selectRaw('MAX(id)')->groupBy('conversation_id'))->join('crm_conversations', 'crm_conversations.id', '=', 'conversation_id')->get(['lead_id', 'text'])->keyBy('lead_id');
+        $cardInterests = DB::table('crm_lead_interests')->join('vacancies', 'vacancies.id', '=', 'vacancy_id')->whereIn('lead_id', $visible->pluck('id'))->get(['lead_id', 'title'])->groupBy('lead_id');
         if ($request->expectsJson()) {
             $safe = fn ($lead) => collect((array) $lead)->only(['id', 'name', 'crm_stage', 'crm_version', 'crm_source', 'assigned_cs_id', 'next_followup_at', 'created_at', 'updated_at'])->all();
 
             return response()->json(['rows' => $rows->through($safe), 'counts' => $counts, 'summary' => $summary, 'stages' => collect($columns)->map(fn ($column, $code) => ['count' => $counts[$code] ?? 0, 'items' => collect($column->items())->map($safe), 'nextCursor' => $column->nextCursor()?->encode()])]);
         }
 
-        return view('conversation.pipeline', ['pipelineOwners' => DB::table('users')->whereIn('id', $this->crm->leads($request, 'crm.pipeline.read')->select('assigned_cs_id'))->get(['id', 'name']), 'rows' => $rows, 'columns' => $columns, 'summary' => $summary, 'ownerNames' => $ownerNames, 'counts' => $counts, 'tagMap' => $tagMap, 'savedViews' => DB::table('crm_saved_views')->where('user_id', $request->user()->id)->get(), 'filters' => $filters, 'allTags' => DB::table('crm_tags')->where('is_active', true)->get(), 'stageSettings' => DB::table('crm_stages')->orderBy('display_order')->get()]);
+        return view('conversation.pipeline', ['filterChannels' => DB::table('whatsapp_channels')->whereIn('id', $this->crm->conversations($request)->select('channel_id'))->get(['id', 'name']), 'filterVacancies' => DB::table('vacancies')->whereIn('id', DB::table('crm_lead_interests')->whereIn('lead_id', $this->crm->leads($request, 'crm.pipeline.read')->select('id'))->select('vacancy_id'))->get(['id', 'title']), 'cardMessages' => $cardMessages, 'cardInterests' => $cardInterests, 'pipelineOwners' => DB::table('users')->whereIn('id', $this->crm->leads($request, 'crm.pipeline.read')->select('assigned_cs_id'))->get(['id', 'name']), 'rows' => $rows, 'columns' => $columns, 'summary' => $summary, 'ownerNames' => $ownerNames, 'counts' => $counts, 'tagMap' => $tagMap, 'savedViews' => DB::table('crm_saved_views')->where('user_id', $request->user()->id)->get(), 'filters' => $filters, 'allTags' => DB::table('crm_tags')->where('is_active', true)->get(), 'stageSettings' => DB::table('crm_stages')->orderBy('display_order')->get()]);
     }
 
-    public function profile(Request $request, int $lead): View
+    public function profile(Request $request, int $lead): View|RedirectResponse
     {
+        $canonical = $lead;
+        $visited = [];
+        while ($alias = DB::table('acquisition_leads')->where('id', $canonical)->value('merged_into_id')) {
+            abort_if(isset($visited[$canonical]), 409, 'Rantai alias perlu ditinjau administrator.');
+            $visited[$canonical] = true;
+            $canonical = (int) $alias;
+        }
+        if ($canonical !== $lead) {
+            $this->crm->leads($request)->where('id', $canonical)->first() ?? abort(404);
+
+            return to_route('crm.profile', $canonical);
+        }
         $row = $this->crm->leads($request)->where('id', $lead)->first() ?? abort(404);
 
-        return view('conversation.profile', ['interests' => DB::table('crm_lead_interests')->join('vacancies', 'vacancies.id', '=', 'vacancy_id')->where('lead_id', $lead)->get(['vacancies.title', 'application_id'])] + $this->details($request, $row) + ['activities' => DB::query()->fromSub(DB::table('crm_activities')->leftJoin('users', 'users.id', '=', 'actor_id')->where('lead_id', $lead)->whereNotIn('event_type', ['message_received', 'message_sent', 'message_queued'])->select('crm_activities.id', 'event_type', 'summary', 'crm_activities.created_at', 'users.name as actor_name')->unionAll(DB::table('crm_messages')->leftJoin('users', 'users.id', '=', 'sent_by_user_id')->whereIn('conversation_id', $this->crm->conversations($request)->where('lead_id', $lead)->select('id'))->whereIn('direction', ['INBOUND', 'OUTBOUND'])->selectRaw("crm_messages.id, CASE WHEN direction = 'INBOUND' THEN 'Pesan masuk' ELSE 'Pesan keluar' END as event_type, text as summary, COALESCE(provider_timestamp, crm_messages.created_at) as created_at, users.name as actor_name")), 'timeline')->orderByDesc('created_at')->orderByDesc('id')->paginate(40), 'conversations' => $this->crm->conversations($request)->where('lead_id', $lead)->get(), 'submissions' => DB::table('lead_submissions')->where('lead_id', $lead)->where('is_test', false)->orderByDesc('id')->limit(30)->get()]);
+        return view('conversation.profile', ['interests' => DB::table('crm_lead_interests')->join('vacancies', 'vacancies.id', '=', 'vacancy_id')->where('lead_id', $lead)->get(['vacancies.title', 'application_id'])] + $this->details($request, $row) + ['activities' => DB::query()->fromSub(DB::table('crm_activities')->leftJoin('users', 'users.id', '=', 'actor_id')->where('lead_id', $lead)->whereNotIn('event_type', ['message_received', 'message_sent', 'message_queued'])->select('crm_activities.id', 'event_type', 'summary', 'crm_activities.created_at', 'users.name as actor_name')->unionAll(DB::table('crm_attribution_touchpoints')->where('lead_id', $lead)->selectRaw('id, event_type, source as summary, event_at as created_at, NULL as actor_name'))->unionAll(DB::table('crm_messages')->leftJoin('users', 'users.id', '=', 'sent_by_user_id')->whereIn('conversation_id', $this->crm->conversations($request)->where('lead_id', $lead)->select('id'))->whereIn('direction', ['INBOUND', 'OUTBOUND'])->selectRaw("crm_messages.id, CASE WHEN direction = 'INBOUND' THEN 'Pesan masuk' ELSE 'Pesan keluar' END as event_type, text as summary, COALESCE(provider_timestamp, crm_messages.created_at) as created_at, users.name as actor_name")), 'timeline')->orderByDesc('created_at')->orderByDesc('id')->paginate(40), 'conversations' => $this->crm->conversations($request)->where('lead_id', $lead)->get(), 'submissions' => DB::table('lead_submissions')->where('lead_id', $lead)->where('is_test', false)->orderByDesc('id')->limit(30)->get()]);
     }
 
     public function createLead(Request $request): RedirectResponse
@@ -288,7 +302,11 @@ class ConversationCrmController extends Controller
             throw ValidationException::withMessages(['whatsapp' => 'Nomor sudah terdaftar. Cari lead yang ada sebelum membuat lead baru.']);
         }
         $id = DB::transaction(function () use ($request, $data, $phone): int {
-            $id = DB::table('acquisition_leads')->insertGetId(['public_token' => (string) Str::uuid(), 'name' => $data['name'], 'normalized_phone' => $phone, 'crm_source' => $data['source'], 'assigned_cs_id' => $request->user()->id, 'crm_stage_entered_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            $created = app(LeadUpsertService::class)->upsert($data['name'], $phone, null, $data['source']);
+            $id = $created->id;
+            if (! $created->assigned_cs_id) {
+                DB::table('acquisition_leads')->where('id', $id)->update(['assigned_cs_id' => $request->user()->id]);
+            }
             if (! empty($data['vacancy_id'])) {
                 abort_unless(DB::table('vacancies')->whereIn('id', app(AccessPolicy::class)->vacancyIds($request->user(), 'crm.lead.edit'))->where('id', $data['vacancy_id'])->exists(), 403);
                 DB::table('crm_lead_interests')->insert(['lead_id' => $id, 'vacancy_id' => $data['vacancy_id'], 'created_at' => now(), 'updated_at' => now()]);
@@ -368,7 +386,7 @@ class ConversationCrmController extends Controller
 
     public function savedView(Request $request): RedirectResponse
     {
-        $data = $request->validate(['name' => 'required|string|max:80', 'filters' => 'required|array:search,stage,owner,tag,overdue,source,from,to,channel,vacancy_id,country_id,campaign,unread,mode,preset,sort,per_page,utm_medium']);
+        $data = $request->validate(['name' => 'required|string|max:80', 'filters' => 'required|array:search,stage,owner,tag,overdue,source,from,to,channel,vacancy_id,country_id,campaign,unread,mode,preset,sort,per_page,utm_medium,assignment_state,conversion_state,followup_state,activity_from,activity_to']);
         DB::table('crm_saved_views')->insert(['user_id' => $request->user()->id, 'name' => $data['name'], 'filters' => json_encode($data['filters']), 'created_at' => now(), 'updated_at' => now()]);
         app(AccessPolicy::class)->audit($request->user(), 'crm.view_saved');
 
@@ -380,39 +398,7 @@ class ConversationCrmController extends Controller
         $this->crm->leads($request, 'lead.convert_to_candidate')->where('id', $lead)->first() ?? abort(404);
         $data = $request->validate(['vacancy_id' => 'required|integer|exists:vacancies,id']);
         abort_unless(DB::table('vacancies')->whereIn('id', app(AccessPolicy::class)->vacancyIds($request->user(), 'lead.convert_to_candidate'))->where('id', $data['vacancy_id'])->exists(), 403);
-        $application = DB::transaction(function () use ($request, $lead, $data): Application {
-            $row = DB::table('acquisition_leads')->where('id', $lead)->lockForUpdate()->first();
-            abort_unless(in_array($row->crm_stage, ['QUALIFIED', 'CONVERTED'], true), 422, 'Lead harus Qualified sebelum dikonversi.');
-            $candidate = $row->candidate_id ? Candidate::withoutGlobalScope('access')->findOrFail($row->candidate_id) : null;
-            if (! $candidate) {
-                $digits = ltrim($row->normalized_phone, '+');
-                $local = str_starts_with($digits, '62') ? '0'.substr($digits, 2) : $digits;
-                $normalized = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(whatsapp, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
-                $people = Person::whereRaw($normalized.' IN (?, ?)', [$digits, $local])->lockForUpdate()->limit(2)->get();
-                abort_if($people->count() > 1, 422, 'Beberapa profil cocok. Tinjau duplikasi sebelum konversi.');
-                $person = $people->first();
-                $candidates = $person ? Candidate::withoutGlobalScope('access')->where('person_id', $person->id)->limit(2)->get() : collect();
-                abort_if($candidates->count() > 1, 422, 'Beberapa candidate cocok. Tinjau duplikasi.');
-                $candidate = $candidates->first();
-                if (! $candidate) {
-                    $person ??= Person::create(['full_name' => $row->name, 'whatsapp' => $row->normalized_phone, 'email' => $row->email]);
-                    $candidate = $person->candidates()->create(['candidate_code' => 'CPMI-'.Str::ulid(), 'status' => 'candidate', 'registered_at' => now(), 'created_by' => $request->user()->id]);
-                }
-            }
-            $application = Application::withoutGlobalScope('access')->where('candidate_id', $candidate->id)->where('vacancy_id', $data['vacancy_id'])->whereNotIn('status', ['closed', 'cancelled', 'rejected'])->first();
-            $application ??= Application::create(['application_code' => 'APP-'.Str::ulid(), 'candidate_id' => $candidate->id, 'vacancy_id' => $data['vacancy_id'], 'assigned_cs_id' => $row->assigned_cs_id, 'status' => 'active', 'applied_at' => now()]);
-            DB::table('crm_lead_interests')->updateOrInsert(['lead_id' => $lead, 'vacancy_id' => $data['vacancy_id']], ['application_id' => $application->id, 'created_at' => now(), 'updated_at' => now()]);
-            DB::table('lead_submissions')->where('lead_id', $lead)->where('vacancy_id', $data['vacancy_id'])->where('is_test', false)->update(['application_id' => $application->id]);
-            DB::table('acquisition_leads')->where('id', $lead)->update(['candidate_id' => $candidate->id, 'status' => 'converted', 'crm_stage' => 'CONVERTED', 'crm_version' => $row->crm_version + 1, 'updated_at' => now()]);
-            if (! DB::table('lead_sources')->where('candidate_id', $candidate->id)->exists()) {
-                $submission = DB::table('lead_submissions')->where('lead_id', $lead)->where('is_test', false)->orderBy('id')->first();
-                $attribution = $submission ? json_decode($submission->attribution, true) : [];
-                DB::table('lead_sources')->insert(['candidate_id' => $candidate->id, 'source' => $attribution['utm_source'] ?? $row->crm_source ?? 'funnel', 'medium' => $attribution['utm_medium'] ?? null, 'campaign' => $attribution['utm_campaign'] ?? null, 'captured_at' => $submission?->created_at ?? $row->created_at]);
-            }
-            $this->crm->activity($lead, 'converted', 'Candidate #'.$candidate->id.' · Lamaran #'.$application->id, $request->user()->id);
-
-            return $application;
-        });
+        $application = app(ConversionService::class)->convert($request, $lead, $data['vacancy_id']);
 
         return to_route('applications.show', $application)->with('success', 'Lead dikonversi; workflow penempatan dilanjutkan melalui lamaran.');
     }
@@ -560,10 +546,19 @@ class ConversationCrmController extends Controller
         return back()->with('success', 'Percakapan ditugaskan kepada Anda.');
     }
 
+    public function createStage(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['name' => 'required|string|max:80', 'color_token' => 'required|in:blue,green,amber,purple', 'sla_hours' => 'nullable|integer|min:1|max:8760']);
+        DB::table('crm_stages')->insert($data + ['code' => 'CUSTOM_'.Str::upper(Str::random(10)), 'display_order' => 4, 'transitions' => json_encode(['LOST']), 'created_at' => now(), 'updated_at' => now()]);
+        app(AccessPolicy::class)->audit($request->user(), 'crm.stage_created', ['name' => $data['name']]);
+
+        return back()->with('success', 'Tahap ditambahkan. Atur transisi dari tahap lain untuk menggunakannya.');
+    }
+
     public function saveStage(Request $request, int $stage): RedirectResponse
     {
         $row = DB::table('crm_stages')->find($stage) ?? abort(404);
-        $data = $request->validate(['name' => 'required|string|max:80', 'display_order' => 'required|integer|min:0|max:100', 'color_token' => 'required|in:blue,green,amber,purple', 'transitions' => 'nullable|array|max:6', 'transitions.*' => ['required', Rule::in(array_diff(array_keys(config('conversation.stages')), ['CONVERTED', $row->code]))]]);
+        $data = $request->validate(['name' => 'required|string|max:80', 'display_order' => 'required|integer|min:0|max:100', 'color_token' => 'required|in:blue,green,amber,purple', 'sla_hours' => 'nullable|integer|min:1|max:8760', 'transitions' => 'nullable|array|max:50', 'transitions.*' => ['required', Rule::in(array_diff(array_keys(config('conversation.stages')), ['CONVERTED', $row->code]))]]);
         $data['transitions'] = json_encode($row->code === 'CONVERTED' ? [] : ($data['transitions'] ?? []));
         DB::table('crm_stages')->where('id', $stage)->update($data + ['updated_at' => now()]);
         app(AccessPolicy::class)->audit($request->user(), 'crm.stage_configured', ['code' => $row->code]);

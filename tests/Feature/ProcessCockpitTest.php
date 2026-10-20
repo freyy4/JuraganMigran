@@ -167,7 +167,7 @@ class ProcessCockpitTest extends TestCase
     {
         $application = Application::factory()->create();
         $this->postJson(route('pipeline.bulk'), ['action' => 'next', 'applications' => [$application->id], 'confirmed' => true])->assertOk()->assertJsonPath('results.0.success', false);
-        $this->postJson(route('pipeline.bulk'), ['action' => 'next', 'applications' => [$application->id], 'waiting_status' => 'WAITING_EXTERNAL', 'next_action' => 'Menunggu konfirmasi jadwal', 'next_action_due_at' => '2026-10-20T09:00', 'confirmed' => true])->assertOk()->assertJsonPath('results.0.success', true);
+        $this->postJson(route('pipeline.bulk'), ['action' => 'next', 'applications' => [$application->id], 'waiting_status' => 'WAITING_EXTERNAL', 'next_action' => 'Menunggu konfirmasi jadwal', 'next_action_due_at' => now()->addDay()->format('Y-m-d\TH:i'), 'confirmed' => true])->assertOk()->assertJsonPath('results.0.success', true);
         $this->getJson(route('pipeline.api', ['widget' => 'rows', 'queue' => 'waiting_external']))->assertJsonPath('total', 1)->assertJsonPath('data.0.operational_status', 'WAITING_EXTERNAL');
         $this->assertDatabaseCount('tasks', 0);
     }

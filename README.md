@@ -3,8 +3,8 @@
 Aplikasi operasional perekrutan dan penempatan pekerja migran, dari perolehan calon kandidat sampai kesiapan proses dan keberangkatan.
 
 <!-- APP-VERSION:START -->
-**Versi pencatatan:** `v0.1.0`  
-**Terakhir diperbarui:** 20 Oktober 2026 (WIB)
+**Versi pencatatan:** `v0.1.1`
+**Terakhir diperbarui:** 2026-10-20 23:51:18 WIB
 <!-- APP-VERSION:END -->
 
 ## Fitur utama
@@ -16,6 +16,21 @@ Aplikasi operasional perekrutan dan penempatan pekerja migran, dari perolehan ca
 - Dashboard, portal, keuangan, laporan, serta pengaturan akses.
 
 
+
+## Pembaruan fitur PRD v8.18 — Unified Acquisition & CRM
+
+Mulai 20 Oktober 2026, form, WhatsApp, lead manual, kontak website, dan impor CSV menggunakan jalur identitas yang sama pada `acquisition_leads`; tidak ada tabel Lead kedua.
+
+- Nomor WhatsApp dinormalisasi sebelum pencocokan. Pengiriman form berulang tetap menyimpan bukti submission terpisah, tetapi memakai Lead/Contact yang sama.
+- Minat tiap lowongan tercatat terpisah. Form tidak langsung membuat Candidate atau Application; konversi Qualified memakai transaksi bersama dan pilihan lowongan yang ditinjau.
+- Attribution disimpan sebagai ledger: first touch, lead creation, latest touch, dan conversion touch. WhatsApp menambah touchpoint tanpa mengganti sumber awal campaign.
+- Owner aktif dipertahankan antar-channel. Lead tanpa owner tetap terlihat dalam antrean penugasan.
+- Inbox memakai composer bertab dan panel detail yang dapat ditutup. Pipeline menyediakan filter lanjutan, drag kartu, pilihan massal kontekstual, pratinjau/urutan field kartu, serta konfigurasi tahap dan SLA.
+- Pusat duplikat memerlukan perbandingan sebelum merge; konflik Candidate ditolak. Lead kedua menjadi alias dan histori tidak dihapus. Data migrasi yang ambigu tetap perlu ditinjau manusia.
+- Impor CSV dibatasi 100 baris per unggahan. Ekspor CSV/XLSX mengikuti filter/pilihan dan izin; kontak bersifat opsional, sedangkan NIK, paspor, data medis, dan isi dokumen tidak ikut ekspor CRM.
+- Laporan Campaign → Lead → Candidate → Application → Departure menggunakan data terkait. Revenue/ROAS tidak dibuat dari nilai perkiraan CRM.
+
+`v8.18` adalah versi spesifikasi fitur; versi `v0.1.x` pada bagian pencatatan di README adalah nomor snapshot Git dan memiliki tujuan berbeda. Ringkasan pengujian dan hasil deployment dicatat pada penyerahan perubahan; catatan update otomatis tidak menyatakan bahwa pengujian lulus.
 
 ## Teknologi dan menjalankan lokal
 
@@ -43,6 +58,7 @@ Ringkasan otomatis dibentuk dari file dan jenis perubahan. Ringkasan menjelaskan
 <!-- AUTO-UPDATES:START -->
 | Tanggal (WIB) | Versi | Update |
 | --- | --- | --- |
+| 2026-10-20 23:51:18 WIB | v0.1.1 | Update fitur acquisition dan CRM terpadu sesuai PRD v8.18: identitas bersama, ledger attribution, konversi, duplikat, Inbox/Pipeline, impor dan ekspor. <!-- snapshot:5f0a4ce1ff4c6c3f1094bbf4de06da4ca52bc31ce1a64b2390401750f78020b6 --> |
 | 20 Oktober 2026 | v0.1.0 | Mulai pencatatan versi; README menjelaskan aplikasi, fitur, cara menjalankan, dan riwayat perubahan. |
 <!-- AUTO-UPDATES:END -->
 

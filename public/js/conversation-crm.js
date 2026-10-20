@@ -1,7 +1,12 @@
 (() => {
     document.querySelectorAll('[data-cc-open]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.ccOpen)?.showModal()));
     document.querySelectorAll('[data-cc-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
-    document.querySelectorAll('[data-cc-inspector]').forEach(button => button.addEventListener('click', () => document.querySelector('.cc-inspector')?.classList.toggle('is-open')));
+    document.querySelectorAll('[data-cc-inspector]').forEach(button => button.addEventListener('click', () => {
+        const inbox = document.querySelector('.cc-inbox');
+        const rail = document.querySelector('.cc-inspector');
+        if (matchMedia('(min-width:1440px)').matches) inbox?.classList.toggle('rail-collapsed');
+        else rail?.classList.toggle('is-open');
+    }));
     document.querySelectorAll('[data-cc-coach]').forEach(coach => {
         const key = `jm-crm-${document.body.dataset.uiUser}-${coach.dataset.ccCoach}`;
         try { if (localStorage.getItem(key)) coach.hidden = true; } catch {}
@@ -11,11 +16,24 @@
     if (composer) {
         const mode = composer.elements.mode;
         const template = composer.elements.template_id;
+        let activeTab = mode.value === 'template' ? 'quick' : mode.value;
+        composer.querySelectorAll('[data-cc-mode]').forEach(button => button.addEventListener('click', () => {
+            activeTab = button.dataset.ccMode;
+            if (activeTab === 'note') mode.value = 'note';
+            else if (activeTab === 'quick' && !mode.querySelector('option[value=text]').disabled) mode.value = 'text';
+            else if (activeTab === 'quick') mode.value = 'template';
+            else mode.value = 'text';
+            render();
+        }));
+        composer.querySelector('[data-cc-official]')?.addEventListener('click', () => { mode.value = 'template'; activeTab = 'quick'; render(); });
         const render = () => {
+            composer.querySelectorAll('[data-cc-mode]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.ccMode === activeTab)); button.disabled = ['text','attachment'].includes(button.dataset.ccMode) && mode.querySelector('option[value=text]').disabled; });
+            const quick = composer.querySelector('[data-cc-quick-panel]');
+            if (quick) quick.hidden = activeTab !== 'quick';
             composer.querySelector('[data-cc-template]').hidden = mode.value !== 'template';
             composer.querySelector('[data-cc-text]').hidden = mode.value === 'template';
             const attachment = composer.querySelector('[data-cc-attachment]');
-            if (attachment) { attachment.hidden = mode.value !== 'text'; attachment.querySelector('input').disabled = mode.value !== 'text'; }
+            if (attachment) { attachment.hidden = mode.value !== 'text' || activeTab !== 'attachment'; attachment.querySelector('input').disabled = mode.value !== 'text' || activeTab !== 'attachment'; }
             const variables = composer.querySelector('[data-cc-variables]');
             variables.replaceChildren();
             const selected = template.selectedOptions[0];
@@ -29,7 +47,7 @@
                 label.append(input); variables.append(label);
             }
         };
-        mode.addEventListener('change', render); template.addEventListener('change', render); render();
+        mode.addEventListener('change', () => { activeTab = mode.value === 'template' ? 'quick' : mode.value; render(); }); template.addEventListener('change', render); render();
         composer.querySelector('[data-cc-quick]').addEventListener('change', event => { if (mode.value === 'text' && event.target.value) composer.elements.text.value = event.target.value; });
     }
     const draftKey = composer?.dataset.provider === 'QR_WEB_SESSION' ? `jm-crm-draft-${document.body.dataset.uiUser}-${composer.dataset.conversationId}` : null;
@@ -58,7 +76,7 @@
                 if (!response.ok) throw new Error('Muat ulang untuk memeriksa akses percakapan.');
                 const data = await response.json();
                 if (data.selected && Number(composer.elements.version.value) !== data.selected.version) {
-                    composer.querySelector('button').disabled = true;
+                    composer.querySelector('button:not([type])').disabled = true;
                     status.textContent = 'Owner atau status berubah. Muat ulang sebelum membalas.';
                     return;
                 }
@@ -129,7 +147,7 @@
         });
         board.addEventListener('dragstart', event => {
             card = event.target.closest('[draggable="true"]');
-            if (!card || saving) { event.preventDefault(); return; }
+            if (!card || saving || event.target.closest('a,button,input,select,textarea,summary')) { event.preventDefault(); return; }
             event.dataTransfer.setData('text/plain', card.dataset.id); event.dataTransfer.effectAllowed = 'move';
         });
         board.addEventListener('dragend', () => { card = null; board.querySelectorAll('.dragover').forEach(column => column.classList.remove('dragover')); });

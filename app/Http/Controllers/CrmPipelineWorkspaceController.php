@@ -99,10 +99,40 @@ class CrmPipelineWorkspaceController extends Controller
         return response()->download(Storage::disk('local')->path($path), 'pipeline-lead.'.$payload['format'], ['Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 
+    public function previewExport(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->hasPermission('lead.export'), 403);
+        $data = $request->validate(['selection' => 'required|in:ids,filtered', 'ids' => 'nullable|array|max:100', 'ids.*' => 'integer|distinct', 'filters' => 'nullable|array']);
+        $filterRequest = Request::create('/', 'GET', $data['filters'] ?? []);
+        $filterRequest->setUserResolver(fn () => $request->user());
+        $query = app(CrmLeadQuery::class)->query($filterRequest, 'lead.export');
+        if ($data['selection'] === 'ids') {
+            $query->whereIn('id', $data['ids'] ?? []);
+        }
+
+        return response()->json(['count' => $query->count(), 'columns' => ['Lead ID', 'Nama', 'Sumber', 'Tahap', 'PIC ID', 'Follow-up', 'Dibuat', 'Diperbarui'], 'destination' => 'Unduhan pribadi']);
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->hasPermission('crm.pipeline.manage'), 403);
+        $data = $request->validate(['ids' => 'required|array|min:1|max:100', 'ids.*' => 'required|integer|distinct|exists:crm_stages,id']);
+        DB::transaction(function () use ($request, $data): void {
+            $stages = DB::table('crm_stages')->orderBy('id')->lockForUpdate()->pluck('id')->all();
+            abort_unless(count($stages) === count($data['ids']) && ! array_diff($stages, $data['ids']), 409, 'Daftar tahap berubah; muat ulang.');
+            foreach ($data['ids'] as $order => $id) {
+                DB::table('crm_stages')->where('id', $id)->update(['display_order' => $order, 'updated_at' => now()]);
+            }
+            app(AccessPolicy::class)->audit($request->user(), 'crm.stages_reordered', ['ids' => $data['ids']]);
+        });
+
+        return response()->json(['ok' => true]);
+    }
+
     public function layout(Request $request): JsonResponse
     {
         if ($request->isMethod('put')) {
-            $data = $request->validate(['scope' => 'required|in:USER,TEAM,SYSTEM', 'version' => 'required|integer|min:0', 'fields' => 'present|array|max:6', 'fields.*' => 'required|distinct|in:avatar,source,owner,tags,followup,activity']);
+            $data = $request->validate(['scope' => 'required|in:USER,TEAM,SYSTEM', 'version' => 'required|integer|min:0', 'fields' => 'present|array|max:8', 'fields.*' => 'required|distinct|in:avatar,source,owner,tags,followup,activity,message,interest']);
             abort_unless($data['scope'] === 'USER' || $request->user()->hasPermission('crm.pipeline.manage'), 403);
             $scopeId = match ($data['scope']) {
                 'USER' => $request->user()->id, 'TEAM' => $request->user()->team_id, default => 0

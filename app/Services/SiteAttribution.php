@@ -57,6 +57,11 @@ class SiteAttribution
 
     public function link(Request $request, int $lead): void
     {
+        $touches = DB::table('site_attribution_touches')->where('anonymous_session_id', $this->session($request))->where(fn ($q) => $q->whereNull('lead_id')->orWhere('lead_id', $lead))->get();
+        foreach ($touches as $touch) {
+            $context = json_decode($touch->context, true) ?: [];
+            app(AttributionService::class)->record($lead, 'site-touch-'.$touch->id, 'LANDING_VIEW', $context['utm_source'] ?? $touch->channel, $context + ['channel' => $touch->channel, 'anonymous_session_id' => $touch->anonymous_session_id, 'landing_url' => $touch->path], $touch->created_at);
+        }
         DB::table('site_attribution_touches')->where('anonymous_session_id', $this->session($request))->whereNull('lead_id')->update(['lead_id' => $lead]);
     }
 

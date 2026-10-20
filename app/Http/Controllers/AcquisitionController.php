@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Application;
-use App\Models\Candidate;
-use App\Models\Person;
 use App\Models\Vacancy;
 use App\Services\AccessPolicy;
 use App\Services\ConversationCrm;
+use App\Services\ConversionService;
 use App\Services\CrmWorkspace;
 use App\Services\CsRouter;
 use App\Services\TrackingHub;
@@ -16,7 +14,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -101,7 +98,7 @@ class AcquisitionController extends Controller
 
     public function scopedLeads(Request $request, string $permission = 'lead.read.basic'): object
     {
-        $query = DB::table('acquisition_leads');
+        $query = DB::table('acquisition_leads')->whereNull('merged_into_id');
         $policies = app(AccessPolicy::class)->policies($request->user(), $permission);
         $query->where(function ($scope) use ($policies, $request): void {
             $scope->whereRaw('1=0');
@@ -219,44 +216,9 @@ class AcquisitionController extends Controller
     {
         $this->scopedLeads($request, 'lead.convert_to_candidate')->where('id', $lead)->first() ?? abort(404);
         $request->validate(['submission_id' => ['required', 'integer']]);
-        $application = DB::transaction(function () use ($request, $lead): Application {
-            $row = DB::table('acquisition_leads')->where('id', $lead)->lockForUpdate()->first();
-            if (! in_array($row->status, ['qualified', 'converted'], true)) {
-                throw ValidationException::withMessages(['status' => 'Lakukan kualifikasi dan pemeriksaan duplikasi sebelum konversi.']);
-            }
-            $submission = DB::table('lead_submissions')->where('id', $request->integer('submission_id'))->where('lead_id', $lead)->where('is_test', false)->lockForUpdate()->first() ?? abort(404);
-            if ($submission->application_id) {
-                return Application::withoutGlobalScope('access')->findOrFail($submission->application_id);
-            }
-            $candidate = $row->candidate_id ? Candidate::withoutGlobalScope('access')->find($row->candidate_id) : null;
-            if (! $candidate) {
-                $digits = ltrim($row->normalized_phone, '+');
-                $local = str_starts_with($digits, '62') ? '0'.substr($digits, 2) : $digits;
-                $normalized = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(whatsapp, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
-                $matches = Person::whereRaw($normalized.' IN (?, ?)', [$digits, $local])->limit(2)->lockForUpdate()->get();
-                if ($matches->count() > 1) {
-                    throw ValidationException::withMessages(['status' => 'Nomor cocok dengan beberapa profil lama. Tim harus meninjau duplikasi sebelum konversi.']);
-                }
-                $person = $matches->first();
-                if ($person && Candidate::withoutGlobalScope('access')->where('person_id', $person->id)->count() > 1) {
-                    throw ValidationException::withMessages(['status' => 'Profil lama memiliki beberapa CPMI. Tinjau duplikasi sebelum konversi.']);
-                }
-                $candidate = $person ? Candidate::withoutGlobalScope('access')->where('person_id', $person->id)->first() : null;
-                if (! $candidate) {
-                    $person ??= Person::create(['full_name' => $row->name, 'whatsapp' => $row->normalized_phone, 'email' => $row->email]);
-                    $candidate = $person->candidates()->create(['candidate_code' => 'CPMI-'.Str::ulid(), 'status' => 'candidate', 'registered_at' => now(), 'created_by' => $request->user()->id]);
-                }
-            }
-            $application = Application::withoutGlobalScope('access')->where('candidate_id', $candidate->id)->where('vacancy_id', $submission->vacancy_id)->whereNotIn('status', ['closed', 'cancelled', 'rejected'])->first();
-            $application ??= Application::create(['application_code' => 'APP-'.Str::ulid(), 'candidate_id' => $candidate->id, 'vacancy_id' => $submission->vacancy_id, 'assigned_cs_id' => $row->assigned_cs_id, 'status' => 'active', 'applied_at' => now()]);
-            DB::table('lead_submissions')->where('lead_id', $lead)->where('vacancy_id', $submission->vacancy_id)->update(['application_id' => $application->id]);
-            DB::table('acquisition_leads')->where('id', $lead)->update(['candidate_id' => $candidate->id, 'status' => 'converted', 'crm_stage' => 'CONVERTED', 'crm_version' => DB::raw('crm_version + 1'), 'updated_at' => now()]);
-            app(ConversationCrm::class)->activity($lead, 'converted', 'Konversi melalui formulir ke lamaran #'.$application->id, $request->user()->id);
-            $attribution = json_decode($submission->attribution, true);
-            DB::table('lead_sources')->insert(['candidate_id' => $candidate->id, 'source' => $attribution['utm_source'] ?? 'funnel', 'medium' => $attribution['utm_medium'] ?? null, 'campaign' => $attribution['utm_campaign'] ?? null, 'content' => $attribution['utm_content'] ?? null, 'referral_code' => $attribution['referral_code'] ?? null, 'landing_url' => $attribution['landing_url'] ?? null, 'captured_at' => $submission->created_at]);
-
-            return $application;
-        });
+        $submission = DB::table('lead_submissions')->where('id', $request->integer('submission_id'))->where('lead_id', $lead)->where('is_test', false)->first() ?? abort(404);
+        abort_unless(DB::table('vacancies')->whereIn('id', app(AccessPolicy::class)->vacancyIds($request->user(), 'lead.convert_to_candidate'))->where('id', $submission->vacancy_id)->exists(), 403);
+        $application = app(ConversionService::class)->convert($request, $lead, $submission->vacancy_id);
 
         return to_route('applications.show', $application)->with('success', 'Lead dikonversi ke CPMI dan lamaran.');
     }

@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vacancy;
+use App\Services\AttributionService;
+use App\Services\ConversationCrm;
 use App\Services\CsRouter;
 use App\Services\DocumentScanner;
 use App\Services\FunnelSchema;
+use App\Services\IdentityResolutionService;
+use App\Services\LeadUpsertService;
 use App\Services\SiteAttribution;
 use App\Services\TrackingHub;
 use Illuminate\Http\JsonResponse;
@@ -95,22 +99,19 @@ class FunnelPublicController extends Controller
                 if ($prior) {
                     return $prior;
                 }
-                $phone = CsRouter::phone($answers['whatsapp']);
-                $email = $answers['email'] ?? null;
-                $lead = DB::table('acquisition_leads')->where('normalized_phone', $phone)->lockForUpdate()->first();
-                $state = $lead ? 'EXISTING_LEAD_NEW_APPLICATION' : 'NEW_LEAD';
-                if (! $lead) {
-                    $review = $email && DB::table('acquisition_leads')->where('email', $email)->exists();
-                    DB::table('acquisition_leads')->insertOrIgnore(['public_token' => (string) Str::uuid(), 'name' => $answers['name'], 'normalized_phone' => $phone, 'email' => $email, 'status' => $review ? 'duplicate_review' : 'new', 'created_at' => now(), 'updated_at' => now()]);
-                    $lead = DB::table('acquisition_leads')->where('normalized_phone', $phone)->lockForUpdate()->first();
-                    $state = $review ? 'REVIEW_DUPLICATE' : $state;
-                }
+                $attribution = $request->session()->get('funnel_attribution.'.$funnel->id, []) + app(SiteAttribution::class)->summary($request) + ['funnel_slug' => $slug, 'version' => $version->version];
+                $existingLead = app(IdentityResolutionService::class)->resolve($answers['whatsapp']);
+                $lead = app(LeadUpsertService::class)->upsert($answers['name'], $answers['whatsapp'], $answers['email'] ?? null, $attribution['utm_source'] ?? 'UNKNOWN');
+                $state = $existingLead ? 'EXISTING_LEAD_NEW_APPLICATION' : 'NEW_LEAD';
                 $prior = DB::table('lead_submissions')->where('lead_id', $lead->id)->where('vacancy_id', $version->vacancy_id)->where('is_test', false)->latest('id')->first();
                 if ($prior) {
                     $state = 'EXISTING_APPLICATION';
                 }
                 $attribution = $request->session()->get('funnel_attribution.'.$funnel->id, []) + app(SiteAttribution::class)->summary($request) + ['funnel_slug' => $slug, 'version' => $version->version];
                 $id = DB::table('lead_submissions')->insertGetId(['public_token' => (string) Str::uuid(), 'idempotency_key' => $entry['token'], 'lead_id' => $lead->id, 'funnel_id' => $funnel->id, 'version_id' => $version->id, 'vacancy_id' => $version->vacancy_id, 'application_id' => $prior?->application_id, 'payload' => json_encode(['encrypted' => Crypt::encryptString(json_encode($answers))]), 'attribution' => json_encode($attribution), 'duplicate_state' => $state, 'consent_version' => $schema['consent_version'], 'consented_at' => now(), 'marketing_consent' => $request->boolean('marketing_consent'), 'is_test' => false, 'created_at' => now(), 'updated_at' => now()]);
+                app(LeadUpsertService::class)->interest($lead->id, $version->vacancy_id);
+                app(AttributionService::class)->record($lead->id, 'submission-'.$id, 'FORM_SUBMITTED', $attribution['utm_source'] ?? 'UNKNOWN', $attribution + ['anonymous_session_id' => app(SiteAttribution::class)->session($request), 'funnel_id' => $funnel->id]);
+                app(ConversationCrm::class)->activity($lead->id, 'form_submitted', 'Formulir #'.$id.' · minat lowongan #'.$version->vacancy_id);
                 app(SiteAttribution::class)->link($request, $lead->id);
                 app(SiteAttribution::class)->event($request, 'form_submit_success', [], $version->vacancy_id);
                 app(CsRouter::class)->assign($lead->id, $version->vacancy_id, $id);

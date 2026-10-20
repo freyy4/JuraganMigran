@@ -80,7 +80,10 @@ class CandidateController extends Controller
             $documentSummary = Application::where('candidate_id', $candidate->id)->whereIn('id', app(AccessPolicy::class)->applicationIds(auth()->user(), 'document.read.metadata'))->get()->map(fn ($application) => ['application' => $application, 'summary' => app(DocumentRequirementEngine::class)->summary($application)]);
         }
 
-        return view('candidates.show', ['healthSummary' => $healthSummary, 'documentSummary' => $documentSummary, 'mobilityTimeline' => $mobilityTimeline, 'candidate' => $candidate->load(['person', 'contacts']), 'followups' => auth()->user()->hasPermission('candidate.read.timeline') ? DB::table('followup_events')->whereIn('lead_id', app(AcquisitionController::class)->scopedLeads(request(), 'candidate.read.timeline')->where('candidate_id', $candidate->id)->select('id'))->latest('id')->get() : collect()]);
+        $crmLeads = auth()->user()->hasPermission('candidate.read.timeline') ? app(AcquisitionController::class)->scopedLeads(request(), 'candidate.read.timeline')->where('candidate_id', $candidate->id)->get(['id', 'name', 'crm_source']) : collect();
+        $crmTimeline = DB::table('crm_activities')->whereIn('lead_id', $crmLeads->pluck('id'))->orderByDesc('created_at')->limit(100)->get(['event_type', 'summary', 'created_at']);
+
+        return view('candidates.show', ['crmLeads' => $crmLeads, 'crmTimeline' => $crmTimeline, 'healthSummary' => $healthSummary, 'documentSummary' => $documentSummary, 'mobilityTimeline' => $mobilityTimeline, 'candidate' => $candidate->load(['person', 'contacts']), 'followups' => auth()->user()->hasPermission('candidate.read.timeline') ? DB::table('followup_events')->whereIn('lead_id', app(AcquisitionController::class)->scopedLeads(request(), 'candidate.read.timeline')->where('candidate_id', $candidate->id)->select('id'))->latest('id')->get() : collect()]);
     }
 
     public function edit(Candidate $candidate): View

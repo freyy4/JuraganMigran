@@ -65,6 +65,7 @@ test('Pipeline workspace supports filters, layout, selection and failed stage ro
         `});
         await navigate('pipeline');
         assert.equal(await evaluate(`!!document.querySelector('[data-cp-select]')`),true);
+        assert.equal(await evaluate(`document.querySelector('.cp-bulk').hidden`),true);
         await evaluate(`document.querySelector('[data-cc-open="cp-filter"]').click()`);
         assert.equal(await evaluate(`document.querySelector('#cp-filter').open`),true);
         assert.equal(await evaluate(`!!document.querySelector('#cp-filter input[name=utm_medium]')`),true);
@@ -72,15 +73,18 @@ test('Pipeline workspace supports filters, layout, selection and failed stage ro
         await delay(100);
         await evaluate(`const input=document.querySelector('[data-cp-field=source]');input.checked=false;input.dispatchEvent(new Event('change'));`);
         assert.equal(await evaluate(`document.querySelector('[data-cp-show=source]').hidden`),true);
+        assert.equal(await evaluate(`document.querySelector('[data-cp-preview=source]').hidden`),true);
         await evaluate(`document.querySelector('[data-cp-save-layout]').click()`);
         await delay(100);
         assert.equal(await evaluate(`window.__calls.some(row=>row.method==='PUT'&&!row.body.fields.includes('source'))`),true);
         await evaluate(`document.querySelector('#cp-layout [data-cc-close]').click();document.querySelector('[data-cp-select-page]').click()`);
         assert.ok((await evaluate(`document.querySelector('[data-cp-selection]').textContent`)).includes('1 lead'));
+        assert.equal(await evaluate(`document.querySelector('.cp-bulk').hidden`),false);
         await evaluate(`document.querySelector('[data-cp-select-filter]').click()`);
         assert.ok((await evaluate(`document.querySelector('[data-cp-selection]').textContent`)).includes('Semua lead'));
         await evaluate(`document.querySelector('[data-cp-clear]').click()`);
         assert.equal(await evaluate(`document.querySelector('[data-cp-select]').checked`),false);
+        assert.equal(await evaluate(`document.querySelector('.cp-bulk').hidden`),true);
         await evaluate(`const select=document.querySelector('[data-cp-move]');select.value='CONTACTED';select.dispatchEvent(new Event('change',{bubbles:true}));`);
         await delay(200);
         assert.equal(await evaluate(`document.querySelector('[data-id]').closest('[data-stage]').dataset.stage`),'NEW');

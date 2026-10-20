@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Country;
 use App\Models\SitePage;
 use App\Services\CsRouter;
+use App\Services\LeadUpsertService;
 use App\Services\PublicVacancies;
 use App\Services\SiteAttribution;
 use App\Services\SiteContent;
@@ -180,8 +181,7 @@ class PublicWebsiteController extends Controller
         abort_unless($request->session()->get('site_contact_key') === $data['idempotency_key'], 419);
         DB::transaction(function () use ($request, $data): void {
             $phone = CsRouter::phone($data['whatsapp']);
-            DB::table('acquisition_leads')->insertOrIgnore(['public_token' => (string) Str::uuid(), 'name' => $data['name'], 'normalized_phone' => $phone, 'status' => 'new', 'created_at' => now(), 'updated_at' => now()]);
-            $lead = DB::table('acquisition_leads')->where('normalized_phone', $phone)->lockForUpdate()->first();
+            $lead = app(LeadUpsertService::class)->upsert($data['name'], $phone, $data['email'] ?? null, 'Website');
             DB::table('site_contact_requests')->insertOrIgnore(['lead_id' => $lead->id, 'idempotency_key' => $data['idempotency_key'], 'message' => Crypt::encryptString($data['message']), 'consent_version' => 'JM-PRIVACY-1', 'created_at' => now(), 'updated_at' => now()]);
             $this->attribution->link($request, $lead->id);
         });

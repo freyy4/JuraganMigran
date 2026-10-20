@@ -55,6 +55,16 @@ test('CRM inbox supports responsive panes, internal notes, help and remembered o
         await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
         await navigate('inbox');
         assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`), 'block');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-attachment]').hidden`), true);
+        await evaluate(`document.querySelector('[data-cc-mode="attachment"]').click()`);
+        assert.equal(await evaluate(`document.querySelector('[data-cc-attachment]').hidden`), false);
+        await evaluate(`document.querySelector('[data-cc-mode="note"]').click()`);
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.mode.value`), 'note');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.attachment.disabled`), true);
+        await evaluate(`document.querySelector('[data-cc-inspector]').click()`);
+        assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`), 'none');
+        await evaluate(`document.querySelector('[data-cc-inspector]').click()`);
+
         assert.equal(await evaluate(`document.querySelector('.cc-inbox').getBoundingClientRect().width <= document.querySelector('main').getBoundingClientRect().width`), true);
         await evaluate(`document.querySelector('[data-cc-open="cc-help"]').click()`);
         assert.equal(await evaluate(`document.getElementById('cc-help').open`), true);
