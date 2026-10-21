@@ -9,12 +9,13 @@
 <x-theme-head/>
 @stack('styles')
 <link rel="stylesheet" href="{{ asset('css/workspace-appearance.css').'?v='.filemtime(public_path('css/workspace-appearance.css')) }}">
+@if(request()->routeIs('crm.*','acquisition.leads'))<link rel="stylesheet" href="{{ asset('css/crm-compact.css').'?v='.filemtime(public_path('css/crm-compact.css')) }}">@endif
 </head>
 <body class="crm-layout" data-ui-user="{{ auth()->id() }}">
 <a class="skip-content" href="#main-content">Langsung ke konten</a>
 @include('layouts.sidebar')
 <div class="crm-workspace">
-<header class="crm-topbar"><div class="topbar-title"><button type="button" class="sidebar-toggle secondary" id="sidebar-toggle" aria-controls="crm-sidebar" aria-expanded="false" aria-label="Buka menu"><x-ui-icon name="menu"/></button><div><small>{{ \Illuminate\Support\Facades\DB::table('crm_settings')->where('key','site_name')->value('value') ?: 'Juragan Migran CRM' }}</small><strong>@yield('title', 'Juragan Migran')</strong></div></div>@auth<div class="topbar-user"><x-theme-toggle/><span class="user-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr(auth()->user()->name,0,1)) }}</span><span class="user-name">{{ auth()->user()->name }}</span><x-logout-form /></div>@endauth</header>
+<header class="crm-topbar"><div class="topbar-title"><button type="button" class="sidebar-toggle secondary" id="sidebar-toggle" aria-controls="crm-sidebar" aria-expanded="false" aria-label="Buka menu"><x-ui-icon name="menu"/></button>@if(request()->routeIs('crm.*','acquisition.leads'))<x-crm-top-rail/>@else<div><small>{{ \Illuminate\Support\Facades\DB::table('crm_settings')->where('key','site_name')->value('value') ?: 'Juragan Migran CRM' }}</small><strong>@yield('title', 'Juragan Migran')</strong></div>@endif</div>@auth<div class="topbar-user"><x-theme-toggle/><span class="user-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr(auth()->user()->name,0,1)) }}</span><span class="user-name">{{ auth()->user()->name }}</span><x-logout-form /></div>@endauth</header>
 <main id="main-content" tabindex="-1">
     @if(session('success'))<div class="notice" role="status">{{ session('success') }}</div>@endif
     @if($errors->any())<div class="errors" role="alert"><strong>Periksa kembali data yang diisi.</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif

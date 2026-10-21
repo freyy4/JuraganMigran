@@ -56,7 +56,23 @@
         finally { event.target.disabled = false; }
     });
     loadLayout(true);
-    document.querySelectorAll('.cp-menu button').forEach(button => button.addEventListener('click', () => button.closest('details').open = false));
+    document.querySelectorAll('.cp-menu button,.cp-menu a').forEach(button => button.addEventListener('click', () => button.closest('details').open = false));
+    document.querySelectorAll('.cp-menu').forEach(menu => {
+        document.addEventListener('click', event => { if (!menu.contains(event.target)) menu.open = false; });
+        menu.addEventListener('keydown', event => {
+            if (event.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); }
+            if (['ArrowDown','ArrowUp','Home','End'].includes(event.key) && menu.open) {
+                event.preventDefault();
+                const items = [...menu.querySelectorAll('button,a')];
+                const index = items.indexOf(document.activeElement);
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+                items[next]?.focus();
+            }
+        });
+    });
+    document.querySelectorAll('[data-cp-stage-id]').forEach(row => row.addEventListener('toggle', () => {
+        if (row.open) document.querySelectorAll('[data-cp-stage-id]').forEach(other => { if (other !== row) other.open = false; });
+    }));
     let draggedStage;
     document.querySelectorAll('[data-cp-stage-id]').forEach(row => {
         row.addEventListener('dragstart', event => { if (event.target.closest('input,select,button')) { event.preventDefault(); return; } draggedStage = row; });
@@ -74,6 +90,10 @@
     const updateSelection = () => {
         pendingKey = null;
         document.querySelector('.cp-bulk').hidden = !allFiltered && !boxes.some(box => box.checked);
+        root.classList.toggle('is-selecting', allFiltered || boxes.some(box => box.checked));
+        const pageSelected = boxes.length > 0 && boxes.every(box => box.checked);
+        document.querySelector('[data-cp-select-page]').checked = pageSelected;
+        document.querySelector('[data-cp-select-filter]').hidden = !pageSelected || allFiltered;
         boxes.forEach(box => box.closest('.cc-lead-card,tr')?.classList.toggle('is-selected', box.checked));
         selectionText.textContent = allFiltered ? 'Semua lead sesuai filter akan diproses.' : `${boxes.filter(box => box.checked).length} lead dipilih`;
     };
@@ -89,7 +109,7 @@
         const summary = document.querySelector('[data-cp-export-summary]');
         if (summary) summary.textContent = `Pilihan saat ini: ${allFiltered ? 'semua hasil filter' : boxes.filter(box => box.checked).length + ' lead'}. Filter tahap dan akses Anda tetap diterapkan pada server.`;
     };
-    document.querySelector('[data-cp-select-start]')?.addEventListener('click', () => { document.querySelector('[data-cp-select-page]').checked = true; document.querySelector('[data-cp-select-page]').dispatchEvent(new Event('change')); });
+    document.querySelector('[data-cp-select-start]')?.addEventListener('click', () => { root.classList.add('is-selecting'); boxes[0]?.focus(); });
     document.querySelector('[data-cp-export]')?.addEventListener('click', () => { action.value = 'export'; form.elements.export_scope.value = 'filtered'; updateAction(); document.getElementById('cp-bulk-action').showModal(); });
     let previewSequence = 0;
     const previewExport = async () => {

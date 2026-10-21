@@ -3,8 +3,8 @@
 Aplikasi operasional perekrutan dan penempatan pekerja migran, dari perolehan calon kandidat sampai kesiapan proses dan keberangkatan.
 
 <!-- APP-VERSION:START -->
-**Versi pencatatan:** `v0.1.1`
-**Terakhir diperbarui:** 2026-10-20 23:51:18 WIB
+**Versi pencatatan:** `v0.1.2`<br>
+**Terakhir diperbarui:** 2026-10-21 17:05:06 WIB
 <!-- APP-VERSION:END -->
 
 ## Fitur utama
@@ -58,6 +58,7 @@ Ringkasan otomatis dibentuk dari file dan jenis perubahan. Ringkasan menjelaskan
 <!-- AUTO-UPDATES:START -->
 | Tanggal (WIB) | Versi | Update |
 | --- | --- | --- |
+| 2026-10-21 17:05:06 WIB | v0.1.2 | Update WhatsApp dan percakapan, CRM dan tindak lanjut, rekrutmen dan 1 bagian lainnya (13 file; 2 ditambah, 11 diubah). <!-- snapshot:9bf6c39a2c1f543be0aea7cbcf8456d7045de0bcd7500202390d9865aa5c80f0 --> |
 | 2026-10-20 23:51:18 WIB | v0.1.1 | Update fitur acquisition dan CRM terpadu sesuai PRD v8.18: identitas bersama, ledger attribution, konversi, duplikat, Inbox/Pipeline, impor dan ekspor. <!-- snapshot:5f0a4ce1ff4c6c3f1094bbf4de06da4ca52bc31ce1a64b2390401750f78020b6 --> |
 | 20 Oktober 2026 | v0.1.0 | Mulai pencatatan versi; README menjelaskan aplikasi, fitur, cara menjalankan, dan riwayat perubahan. |
 <!-- AUTO-UPDATES:END -->

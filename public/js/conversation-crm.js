@@ -1,12 +1,46 @@
 (() => {
     document.querySelectorAll('[data-cc-open]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.ccOpen)?.showModal()));
     document.querySelectorAll('[data-cc-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+    const workspace = document.querySelector('.cc-inbox');
+    const inspector = workspace?.querySelector('.cc-inspector');
+    const inspectorKey = `jm-crm-${document.body.dataset.uiUser}-inspector-collapsed`;
+    const inspectorDesktop = matchMedia('(min-width:1200px)');
+    const syncInspector = () => {
+        const open = inspectorDesktop.matches ? !workspace?.classList.contains('rail-collapsed') : inspector?.classList.contains('is-open');
+        document.querySelectorAll('[data-cc-inspector]').forEach(button => button.setAttribute('aria-expanded', String(!!open)));
+        if (inspector) inspector.inert = !open;
+    };
+    try { if (localStorage.getItem(inspectorKey) === 'true') workspace?.classList.add('rail-collapsed'); } catch {}
+    syncInspector(); inspectorDesktop.addEventListener('change', syncInspector);
     document.querySelectorAll('[data-cc-inspector]').forEach(button => button.addEventListener('click', () => {
-        const inbox = document.querySelector('.cc-inbox');
-        const rail = document.querySelector('.cc-inspector');
-        if (matchMedia('(min-width:1440px)').matches) inbox?.classList.toggle('rail-collapsed');
-        else rail?.classList.toggle('is-open');
+        if (inspectorDesktop.matches) {
+            workspace?.classList.toggle('rail-collapsed');
+            try { localStorage.setItem(inspectorKey, String(workspace.classList.contains('rail-collapsed'))); } catch {}
+        } else inspector?.classList.toggle('is-open');
+        syncInspector();
+        if (button.classList.contains('cc-inspector-close')) workspace?.querySelector('.cc-thread-head [data-cc-inspector]')?.focus();
+        else if (!inspector?.inert) inspector?.querySelector('button,a,summary')?.focus();
     }));
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && inspector?.classList.contains('is-open')) {
+            inspector.classList.remove('is-open'); syncInspector(); workspace.querySelector('.cc-thread-head [data-cc-inspector]')?.focus();
+        }
+    });
+    inspector?.querySelectorAll('.cc-panel').forEach((panel, index) => {
+        if (index === 0 || !panel.querySelector(':scope > h3')) return;
+        const heading = panel.querySelector(':scope > h3');
+        const accordion = document.createElement('details'); accordion.className = panel.className;
+        const summary = document.createElement('summary'); summary.append(heading); accordion.append(summary);
+        while (panel.firstChild) accordion.append(panel.firstChild);
+        panel.replaceWith(accordion);
+    });
+    const listFilter = document.querySelector('.cc-list-filter');
+    if (listFilter) {
+        listFilter.classList.add('is-enhanced');
+        listFilter.querySelectorAll('select').forEach(select => select.addEventListener('change', () => listFilter.requestSubmit()));
+        let searchTimer;
+        listFilter.querySelector('input[name=search]')?.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => listFilter.requestSubmit(), 300); });
+    }
     document.querySelectorAll('[data-cc-coach]').forEach(coach => {
         const key = `jm-crm-${document.body.dataset.uiUser}-${coach.dataset.ccCoach}`;
         try { if (localStorage.getItem(key)) coach.hidden = true; } catch {}
@@ -15,6 +49,9 @@
     const composer = document.querySelector('[data-cc-composer]');
     if (composer) {
         const mode = composer.elements.mode;
+        const textArea = composer.elements.text;
+        const grow = () => { textArea.style.height = 'auto'; textArea.style.height = Math.min(120, Math.max(48, textArea.scrollHeight)) + 'px'; };
+        textArea.addEventListener('input', grow); grow();
         const template = composer.elements.template_id;
         let activeTab = mode.value === 'template' ? 'quick' : mode.value;
         composer.querySelectorAll('[data-cc-mode]').forEach(button => button.addEventListener('click', () => {
@@ -31,7 +68,9 @@
             const quick = composer.querySelector('[data-cc-quick-panel]');
             if (quick) quick.hidden = activeTab !== 'quick';
             composer.querySelector('[data-cc-template]').hidden = mode.value !== 'template';
-            composer.querySelector('[data-cc-text]').hidden = mode.value === 'template';
+            composer.querySelector('[data-cc-text]').hidden = mode.value === 'template' || activeTab === 'attachment';
+            composer.classList.toggle('is-internal', activeTab === 'note');
+            textArea.placeholder = activeTab === 'note' ? 'Catatan internal · hanya terlihat di CRM…' : 'Ketik pesan…';
             const attachment = composer.querySelector('[data-cc-attachment]');
             if (attachment) { attachment.hidden = mode.value !== 'text' || activeTab !== 'attachment'; attachment.querySelector('input').disabled = mode.value !== 'text' || activeTab !== 'attachment'; }
             const variables = composer.querySelector('[data-cc-variables]');
@@ -132,7 +171,20 @@
                 if (!response.ok) throw new Error(response.status === 409 ? 'Lead telah diubah pengguna lain. Muat ulang sebelum mencoba lagi.' : Object.values(result.errors || {}).flat()[0] || result.message || 'Tahap gagal diperbarui.');
                 moving.dataset.version = result.version;
                 feedback.textContent = 'Tahap berhasil diperbarui.';
-                location.reload();
+                const targets = JSON.parse(board.dataset.transitions || '{}')[result.stage] || [];
+                const fallback = moving.querySelector('[data-cp-move]');
+                if (fallback) {
+                    fallback.replaceChildren(new Option('Pilih tahap…', ''));
+                    targets.forEach(stage => fallback.add(new Option(board.querySelector(`[data-stage="${stage}"] h2`)?.textContent || stage, stage)));
+                    fallback.closest('details').hidden = !targets.length;
+                }
+                moving.draggable = result.stage !== 'CONVERTED';
+                moving.classList.add('cc-drop-success');
+                setTimeout(() => moving.classList.remove('cc-drop-success'), 180);
+                board.querySelectorAll('[data-stage]').forEach(stage => {
+                    const empty = stage.querySelector('.cc-column-empty');
+                    if (empty) empty.hidden = !!stage.querySelector('[data-id]');
+                });
             } catch (error) {
                 original.insertBefore(moving, next);
                 counts.forEach((item, index) => item.textContent = oldCounts[index]);
@@ -148,16 +200,17 @@
         board.addEventListener('dragstart', event => {
             card = event.target.closest('[draggable="true"]');
             if (!card || saving || event.target.closest('a,button,input,select,textarea,summary')) { event.preventDefault(); return; }
+            card.classList.add('is-dragging');
             event.dataTransfer.setData('text/plain', card.dataset.id); event.dataTransfer.effectAllowed = 'move';
         });
-        board.addEventListener('dragend', () => { card = null; board.querySelectorAll('.dragover').forEach(column => column.classList.remove('dragover')); });
+        board.addEventListener('dragend', () => { board.querySelectorAll('.is-dragging').forEach(item => item.classList.remove('is-dragging')); card = null; board.querySelectorAll('.dragover').forEach(column => column.classList.remove('dragover')); });
         board.querySelectorAll('[data-stage]').forEach(column => {
             column.addEventListener('dragover', event => {
                 if (!card || saving) return;
                 event.preventDefault(); column.classList.add('dragover');
                 const rect = board.getBoundingClientRect();
-                if (event.clientX < rect.left + 70) board.scrollLeft -= 20;
-                if (event.clientX > rect.right - 70) board.scrollLeft += 20;
+                if (event.clientX < rect.left + 56) board.scrollLeft -= 20;
+                if (event.clientX > rect.right - 56) board.scrollLeft += 20;
             });
             column.addEventListener('dragleave', event => { if (!column.contains(event.relatedTarget)) column.classList.remove('dragover'); });
             column.addEventListener('drop', async event => {

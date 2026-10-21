@@ -51,7 +51,7 @@ test('Pipeline workspace supports filters, layout, selection and failed stage ro
             for(const pair of pairs){const foreground=luminance(pair.foreground),background=luminance(pair.background);assert.ok((Math.max(foreground,background)+0.05)/(Math.min(foreground,background)+0.05)>=4.5,pair.selector+' needs readable text contrast');}
         };
         await send('Page.enable');
-        const navigate = async page => { await send('Page.navigate',{url:origin+'/'+page}); for (let i=0;i<80;i++) { await delay(50); if (await evaluate(`document.readyState==='complete' && !!document.querySelector('.cc-heading')`)) return; } throw Error('Navigation failed'); };
+        const navigate = async page => { await send('Page.navigate',{url:origin+'/'+page}); for (let i=0;i<80;i++) { await delay(50); if (await evaluate(`document.readyState==='complete' && !!document.querySelector('.crm-top-rail')`)) return; } throw Error('Navigation failed'); };
         await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
         await send('Page.addScriptToEvaluateOnNewDocument',{source:`
             window.__calls=[];

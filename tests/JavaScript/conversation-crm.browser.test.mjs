@@ -51,7 +51,7 @@ test('CRM inbox supports responsive panes, internal notes, help and remembered o
             for(const pair of pairs){const foreground=luminance(pair.foreground),background=luminance(pair.background);assert.ok((Math.max(foreground,background)+0.05)/(Math.min(foreground,background)+0.05)>=4.5,pair.selector+' needs readable text contrast');}
         };
         await send('Page.enable');
-        const navigate = async page => { await send('Page.navigate',{url:origin+'/'+page}); for (let i=0;i<80;i++) { await delay(50); if (await evaluate(`document.readyState==='complete' && !!document.querySelector('.cc-heading')`)) return; } throw Error('Navigation failed'); };
+        const navigate = async page => { await send('Page.navigate',{url:origin+'/'+page}); for (let i=0;i<80;i++) { await delay(50); if (await evaluate(`document.readyState==='complete' && !!document.querySelector('.crm-top-rail')`)) return; } throw Error('Navigation failed'); };
         await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
         await navigate('inbox');
         assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`), 'block');
@@ -68,7 +68,7 @@ test('CRM inbox supports responsive panes, internal notes, help and remembered o
         assert.equal(await evaluate(`document.querySelector('.cc-inbox').getBoundingClientRect().width <= document.querySelector('main').getBoundingClientRect().width`), true);
         await evaluate(`document.querySelector('[data-cc-open="cc-help"]').click()`);
         assert.equal(await evaluate(`document.getElementById('cc-help').open`), true);
-        await evaluate(`document.querySelector('#cc-help [data-cc-close]').click();document.querySelector('[data-cc-dismiss-coach]').click()`);
+        await evaluate(`document.querySelector('#cc-help [data-cc-close]').click()`);
         await evaluate(`document.querySelector('[data-cc-composer]').elements.mode.value='note';document.querySelector('[data-cc-composer]').elements.mode.dispatchEvent(new Event('change'))`);
         assert.equal(await evaluate(`document.querySelector('[data-cc-text]').hidden`), false);
         assert.equal(await evaluate(`document.querySelector('[data-cc-template]').hidden`), true);
@@ -82,9 +82,11 @@ test('CRM inbox supports responsive panes, internal notes, help and remembered o
         assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-thread')).display`), 'flex');
         assert.equal(await evaluate(`document.querySelector('.cc-inbox').getBoundingClientRect().bottom <= innerHeight`), true);
         assert.equal(await evaluate(`document.querySelector('.cc-composer').getBoundingClientRect().bottom <= innerHeight`), true);
+        assert.ok(await evaluate(`document.querySelector('.cc-composer').getBoundingClientRect().height > 120`), 'Composer must remain visible on mobile');
+        await delay(300);
         const screenshot = await send('Page.captureScreenshot',{format:'png'}); fs.writeFileSync(path.join(fixtures,'mobile.png'),Buffer.from(screenshot.data,'base64'));
         await navigate('inbox');
-        assert.equal(await evaluate(`document.querySelector('[data-cc-coach]').hidden`), true);
+        assert.equal(await evaluate(`!!document.querySelector('.cc-heading')`), false);
         await navigate('pipeline');
         assert.equal(await evaluate(`document.querySelectorAll('.cc-column.mobile-active').length`), 1);
         await evaluate(`document.querySelector('.cc-mobile-stages').value='DISCUSSION';document.querySelector('.cc-mobile-stages').dispatchEvent(new Event('change'))`);
@@ -173,7 +175,7 @@ test('CRM inbox supports responsive panes, internal notes, help and remembered o
         await evaluate(`document.querySelector('[data-theme-toggle]').click()`);
         assert.equal(await evaluate(`document.documentElement.dataset.theme`), 'dark');
         await checkContrast(['.cc-message','.cc-tabs a:not(.active)','.cc-tabs a.active']);
-        await checkDark(['.cc-inbox','.cc-composer','.cc-panel','.cc-messages','.cc-message','.cc-metrics>div','.cc-tabs a:not(.active)']);
+        await checkDark(['.cc-inbox','.cc-composer','.cc-panel','.cc-messages','.cc-message','.cc-tabs a:not(.active)']);
         await evaluate(`document.querySelector('[data-cc-open="cc-help"]').click()`);
         await checkDark(['.cc-dialog']);
         await evaluate(`document.querySelector('#cc-help [data-cc-close]').click()`);
