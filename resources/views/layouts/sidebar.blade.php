@@ -1,23 +1,5 @@
-@php
-    $groups = collect(config('navigation'))->map(function ($group) {
-        $group['items'] = array_values(array_filter($group['items'], function ($item) {
-            $permission = $item['permission'] ?? app(\App\Services\AccessPolicy::class)->routePermission($item['route']);
-            return !($item['hidden'] ?? false) && $permission && auth()->user()->hasPermission($permission) && (!isset($item['permission']) || auth()->user()->hasPermission(app(\App\Services\AccessPolicy::class)->routePermission($item['route']) ?? ''));
-        }));
-        return $group;
-    })->filter(fn ($group) => count($group['items']))->values()->all();
-    $currentKey = null;
-    $requestedKey = request('menu');
-    $matches = collect($groups)->flatMap(fn ($group) => $group['items'])->filter(function ($item) {
-        if (!$item['route'] || !request()->routeIs($item['active'])) return false;
-        foreach ($item['parameters'] ?? [] as $key => $value) {
-            if ((string)(request()->route($key) ?? request($key)) !== (string)$value) return false;
-        }
-        return true;
-    });
-    $current = $matches->firstWhere('key', $requestedKey) ?? $matches->sortByDesc(fn ($item) => count($item['parameters'] ?? []))->first();
-    $currentKey = $current['key'] ?? null;
-@endphp
+@php($groups = $workspaceNavigation['groups'])
+@php($currentKey = $workspaceNavigation['current_key'])
 <aside class="crm-sidebar" id="crm-sidebar" aria-label="Navigasi utama">
     <div class="sidebar-brand"><a class="brand" aria-label="Juragan Migran" href="{{ auth()->user()->crmHomeUrl() }}"><span class="brand-symbol" aria-hidden="true">JM</span><span class="sidebar-brand-label">Juragan Migran<small>Manajemen Penempatan</small></span></a><button type="button" class="sidebar-close" data-sidebar-close aria-label="Tutup menu">×</button></div>
     <nav aria-label="Menu utama" class="sidebar-nav">
