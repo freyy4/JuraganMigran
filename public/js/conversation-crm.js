@@ -128,7 +128,7 @@
         mode.addEventListener('change', () => { activeTab = mode.value === 'template' ? 'quick' : mode.value; render(); }); template.addEventListener('change', render); render();
         composer.querySelector('[data-cc-quick]').addEventListener('change', event => { if (mode.value === 'text' && event.target.value) composer.elements.text.value = event.target.value; });
     }
-    const draftKey = composer?.dataset.provider === 'QR_WEB_SESSION' ? `jm-crm-draft-${document.body.dataset.uiUser}-${composer.dataset.conversationId}` : null;
+    const draftKey = composer ? `jm-crm-draft-${document.body.dataset.uiUser}-${composer.dataset.conversationId}` : null;
     const clearDraft = message => {
         if (!draftKey || !['SENT','DELIVERED','READ'].includes(message.status)) return;
         try {
@@ -137,27 +137,90 @@
         } catch {}
     };
     if (draftKey) {
-        try {const draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(draft?.text&&!composer.elements.text.value)composer.elements.text.value=draft.text;}catch{}
-        const preserve=()=>{if(composer.elements.mode.value!=='text')return;try{sessionStorage.setItem(draftKey,JSON.stringify({text:composer.elements.text.value,clientKey:composer.elements.client_key.value}));}catch{}};
-        composer.elements.text.addEventListener('input',preserve);composer.addEventListener('submit',preserve);
+        try {const draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(draft?.text&&!composer.elements.text.value){composer.elements.text.value=draft.text;if(draft.clientKey)composer.elements.client_key.value=draft.clientKey;if(draft.mode){const select=composer.querySelector('[data-cc-mode-select]');select.value=draft.mode;select.dispatchEvent(new Event('change'));}}}catch{}
+        const preserve=()=>{try{sessionStorage.setItem(draftKey,JSON.stringify({text:composer.elements.text.value,clientKey:composer.elements.client_key.value,mode:composer.elements.mode.value}));}catch{}};
+        composer.elements.text.addEventListener('input',preserve);composer.addEventListener('change',preserve);composer.addEventListener('submit',preserve);composer.elements.text.dispatchEvent(new Event('input'));
     }
     const messages = document.querySelector('.cc-messages'); if (messages && !new URLSearchParams(location.search).has('before')) messages.scrollTop = messages.scrollHeight;
     const inbox = document.querySelector('[data-cc-inbox]');
-    if (inbox && composer && !new URLSearchParams(location.search).has('before')) {
+    const notice = document.querySelector('[data-cc-notice]');
+    const notify = text => { if (notice) { notice.textContent = text; notice.hidden = !text; } };
+    let sending = false;
+    let canReply = true;
+    let refreshConversation = async () => {};
+    const sendButton = composer?.querySelector('.cc-compose-footer button');
+    const syncSendButton = () => { if (sendButton) sendButton.disabled = sending || !canReply; };
+    if (composer) composer.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (sending || !canReply) return;
+        sending = true; syncSendButton();
+        const submittedText = composer.elements.text.value;
+        const submittedKey = composer.elements.client_key.value;
+        try {
+            const response = await fetch(composer.action, {
+                method: 'POST', body: new FormData(composer),
+                headers: {'Accept': 'application/json'}, signal: AbortSignal.timeout(30000)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                if ([403,404].includes(response.status)) canReply = false;
+                notify(response.status === 409
+                    ? 'Owner atau status percakapan berubah. Draft tetap tersimpan; periksa data terbaru sebelum mengirim kembali.'
+                    : Object.values(data.errors || {}).flat().join(' ') || data.message || 'Pesan belum terkirim. Periksa akses atau koneksi Anda. Draft tetap tersimpan.');
+                if ([403,404,409].includes(response.status)) await refreshConversation();
+                return;
+            }
+            if (composer.elements.client_key.value === submittedKey) {
+                composer.elements.client_key.value = crypto.randomUUID();
+                if (composer.elements.text.value === submittedText) {
+                    composer.elements.text.value = '';
+                    composer.elements.attachment.value = '';
+                    try { sessionStorage.removeItem(draftKey); } catch {}
+                    composer.elements.text.dispatchEvent(new Event('input'));
+                }
+            }
+            notify(data.status === 'SAVED' ? 'Catatan internal disimpan.' : 'Pesan masuk antrean. Status pengiriman diperbarui otomatis.');
+            await refreshConversation();
+        } catch {
+            notify('Pengiriman belum dapat dipastikan. Draft tetap tersimpan. Periksa koneksi sebelum mencoba kembali.');
+        } finally { sending = false; syncSendButton(); }
+    });
+    if (inbox && composer) {
         const status = document.querySelector('[data-cc-live-status]');
         let inFlight = false;
-        setInterval(async () => {
-            if (document.hidden || inFlight) return;
+        refreshConversation = async () => {
+            if (inFlight) return;
             inFlight = true;
             try {
-                const response = await fetch(inbox.dataset.pollUrl, {headers: {'Accept':'application/json'}});
-                if (!response.ok) throw new Error('Muat ulang untuk memeriksa akses percakapan.');
-                const data = await response.json();
-                if (data.selected && Number(composer.elements.version.value) !== data.selected.version) {
-                    composer.querySelector('button:not([type])').disabled = true;
-                    status.textContent = 'Owner atau status berubah. Muat ulang sebelum membalas.';
+                const response = await fetch(inbox.dataset.pollUrl, {headers: {'Accept':'application/json'}, cache: 'no-store', signal: AbortSignal.timeout(15000)});
+                if ([401,403,404].includes(response.status)) {
+                    canReply = false; syncSendButton();
+                    notify('Akses percakapan berubah atau sesi berakhir. Draft tetap tersimpan. Buka kembali inbox untuk melanjutkan.');
                     return;
                 }
+                if (!response.ok) throw new Error('Koneksi terputus; pembaruan akan dicoba lagi.');
+                const data = await response.json();
+                if (data.selected) {
+                    if (Number(composer.elements.version.value) !== data.selected.version) {
+                        notify('Owner atau status percakapan diperbarui. Draft tetap tersimpan; periksa perubahan sebelum mengirim.');
+                    }
+                    document.querySelectorAll('.cc-thread input[name=version]').forEach(input => input.value = data.selected.version);
+                    canReply = data.selected.can_reply === true;
+                    syncSendButton();
+                    const owner = document.querySelector('[data-cc-owner]');
+                    if (owner) owner.textContent = data.selected.owner_name || 'Belum ditugaskan';
+                    const state = document.querySelector('[data-cc-conversation-status]');
+                    if (state) state.textContent = data.selected.status;
+                    const closeStatus = document.querySelector('.cc-thread-menu input[name=status]');
+                    if (closeStatus) {
+                        closeStatus.value = data.selected.status === 'OPEN' ? 'CLOSED' : 'OPEN';
+                        closeStatus.closest('details').querySelector('summary').textContent = data.selected.status === 'OPEN' ? 'Tutup percakapan' : 'Buka kembali percakapan';
+                    }
+                    const windowOpen = composer.dataset.provider === 'QR_WEB_SESSION' || new Date((data.selected.service_window_expires_at || '').replace(' ', 'T') + 'Z') > new Date();
+                    composer.querySelector('[data-cc-mode-select] option[value=text]').disabled = !windowOpen;
+                    if (!canReply) notify('Percakapan ditutup atau Anda bukan owner aktif. Draft tetap tersimpan.');
+                }
+                if (new URLSearchParams(location.search).has('before')) return;
                 const nearBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 100;
                 for (const message of data.messages || []) {
                     clearDraft(message);
@@ -167,13 +230,21 @@
                     const item = document.createElement('article'); item.dataset.messageId = message.id; item.className = 'cc-message';
                     item.classList.toggle('outbound', message.direction === 'OUTBOUND'); item.classList.toggle('internal', message.direction === 'INTERNAL');
                     if (message.direction === 'INTERNAL') { const label = document.createElement('strong'); label.textContent = 'Catatan internal · tidak dikirim'; item.append(label); }
-                    const text = document.createElement('p'); text.textContent = message.text; const small = document.createElement('small'); small.textContent = caption; item.append(text, small); messages.append(item);
+                    const text = document.createElement('p'); text.textContent = message.text; const small = document.createElement('small'); small.textContent = caption; item.append(text, small); if (message.direction === 'INBOUND' && ['image','document'].includes(message.message_type)) {
+                        const link = document.createElement('a');
+                        link.href = composer.action.replace(/\/send$/, `/messages/${Number(message.id)}/attachment`);
+                        link.textContent = 'Unduh lampiran (pemeriksaan keamanan)'; item.append(link);
+                    }
+                    messages.append(item);
                 }
                 if (nearBottom) messages.scrollTop = messages.scrollHeight;
                 status.textContent = 'Tersinkron · ' + new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
             } catch (error) { status.textContent = error.message || 'Koneksi terputus; mencoba lagi.'; }
             finally { inFlight = false; }
-        }, 10000);
+        };
+        setInterval(() => { if (!document.hidden && !sending) refreshConversation(); }, 5000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && !sending) refreshConversation(); });
+        refreshConversation();
     }
     const board = document.querySelector('[data-cc-board]');
     if (board) {

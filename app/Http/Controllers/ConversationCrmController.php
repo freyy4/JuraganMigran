@@ -69,6 +69,11 @@ class ConversationCrmController extends Controller
         if ($request->expectsJson()) {
             if ($selected) {
                 unset($selected->wa_contact_id);
+                $channel = DB::table('whatsapp_channels')->find($selected->channel_id);
+                $selected->owner_name = User::find($selected->assigned_user_id)?->name;
+                $selected->can_reply = $this->crm->conversations($request, 'crm.conversation.reply')->where('id', $selected->id)->exists()
+                    && (! $channel->strict_owner || $selected->assigned_user_id === $request->user()->id)
+                    && $selected->status === 'OPEN';
             }
             $conversations->through(function ($conversation) {
                 unset($conversation->wa_contact_id);
@@ -115,7 +120,7 @@ class ConversationCrmController extends Controller
             $id = DB::transaction(function () use ($data, $request, $conversation, $scoped, &$storedMedia): ?int {
                 $row = DB::table('crm_conversations')->where('id', $conversation)->lockForUpdate()->first();
                 $channel = DB::table('whatsapp_channels')->find($row->channel_id);
-                abort_if($row->version !== $data['version'], 409, 'Owner percakapan berubah. Muat ulang sebelum mengirim.');
+                abort_if($row->version !== (int) $data['version'], 409, 'Owner percakapan berubah. Muat ulang sebelum mengirim.');
                 abort_if($channel->strict_owner && $row->assigned_user_id !== $request->user()->id, 409, 'Hanya owner aktif dapat membalas. Ambil alih percakapan dengan alasan terlebih dahulu.');
                 abort_if($row->status !== 'OPEN', 422, 'Buka kembali percakapan sebelum membalas.');
                 $existing = DB::table('crm_messages')->where('client_key', $data['client_key'])->first();
@@ -205,7 +210,7 @@ class ConversationCrmController extends Controller
         $this->crm->conversations($request, $permission)->where('id', $conversation)->first() ?? abort(404);
         DB::transaction(function () use ($request, $conversation, $data, $permission): void {
             $row = DB::table('crm_conversations')->where('id', $conversation)->lockForUpdate()->first();
-            abort_if($row->version !== $data['version'], 409, 'Penugasan sudah berubah. Muat ulang.');
+            abort_if($row->version !== (int) $data['version'], 409, 'Penugasan sudah berubah. Muat ulang.');
             abort_if(DB::table('crm_messages')->where('conversation_id', $conversation)->where('status', 'SENDING')->lockForUpdate()->exists(), 409, 'Pesan sedang dikirim. Tunggu status pengiriman sebelum transfer owner.');
             $user = User::findOrFail($permission === 'crm.conversation.takeover' ? $request->user()->id : ($data['user_id'] ?? 0));
             abort_unless($user->is_active && $user->hasPermission('crm.conversation.reply'), 422, 'Pilih CS aktif yang dapat membalas.');
@@ -537,7 +542,7 @@ class ConversationCrmController extends Controller
         $data = $request->validate(['version' => 'required|integer|min:0']);
         DB::transaction(function () use ($request, $conversation, $data): void {
             $row = $this->crm->conversations($request)->where('id', $conversation)->lockForUpdate()->first() ?? abort(404);
-            abort_if($row->assigned_user_id || $row->version !== $data['version'], 409, 'Percakapan telah diambil CS lain. Muat ulang antrean.');
+            abort_if($row->assigned_user_id || $row->version !== (int) $data['version'], 409, 'Percakapan telah diambil CS lain. Muat ulang antrean.');
             abort_unless($request->user()->team_id && $row->team_id === $request->user()->team_id, 403);
             DB::table('crm_conversations')->where('id', $conversation)->update(['assigned_user_id' => $request->user()->id, 'version' => $row->version + 1]);
             DB::table('acquisition_leads')->where('id', $row->lead_id)->update(['assigned_cs_id' => $request->user()->id]);

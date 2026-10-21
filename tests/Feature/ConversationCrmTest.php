@@ -113,6 +113,44 @@ class ConversationCrmTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_live_inbox_reports_owner_version_and_reply_access_after_transfer(): void
+    {
+        $owner = $this->user();
+        $supervisor = $this->user('supervisor');
+        $other = $this->user();
+        $conversation = $this->incoming();
+        $url = route('crm.api-inbox', ['conversation' => $conversation->id]);
+        $this->actingAs($owner)->getJson($url)->assertOk()
+            ->assertJsonPath('selected.can_reply', true)
+            ->assertJsonPath('selected.owner_name', $owner->name);
+        $this->actingAs($supervisor)->post(route('crm.assign', $conversation->id), [
+            'user_id' => $other->id, 'version' => '0', 'reason' => 'Transfer shift',
+        ])->assertRedirect();
+        $this->getJson($url)->assertOk()
+            ->assertJsonPath('selected.version', 1)
+            ->assertJsonPath('selected.owner_name', $other->name)
+            ->assertJsonPath('selected.can_reply', false);
+        $this->actingAs($owner)->getJson($url)->assertNotFound();
+        $this->postJson(route('crm.send', $conversation->id), [
+            'mode' => 'text', 'text' => 'Draft lama', 'version' => '0', 'client_key' => (string) Str::uuid(),
+        ])->assertNotFound();
+        $this->assertDatabaseMissing('crm_messages', ['text' => 'Draft lama']);
+    }
+
+    public function test_multipart_composer_accepts_string_version_and_rejects_stale_version_as_json(): void
+    {
+        $owner = $this->user();
+        $conversation = $this->incoming();
+        $data = ['mode' => 'note', 'text' => 'Catatan dari form', 'version' => '0', 'client_key' => (string) Str::uuid()];
+        $this->actingAs($owner)->post(route('crm.send', $conversation->id), $data, ['Accept' => 'application/json'])
+            ->assertAccepted()->assertJsonPath('status', 'SAVED');
+        DB::table('crm_conversations')->where('id', $conversation->id)->update(['version' => 1]);
+        $data['client_key'] = (string) Str::uuid();
+        $this->post(route('crm.send', $conversation->id), $data, ['Accept' => 'application/json'])
+            ->assertConflict()->assertJsonStructure(['message']);
+        $this->assertDatabaseCount('crm_messages', 2);
+    }
+
     public function test_internal_note_never_reaches_meta_and_freeform_requires_open_window(): void
     {
         $cs = $this->user();

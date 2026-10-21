@@ -54,6 +54,41 @@ test('CRM inbox supports compact responsive panes, visible composer, internal no
         const navigate = async page => { await send('Page.navigate',{url:origin+'/'+page}); for (let i=0;i<80;i++) { await delay(50); if (await evaluate(`document.readyState==='complete' && !!document.querySelector('.crm-top-rail')`)) return; } throw Error('Navigation failed'); };
         await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
         await navigate('inbox');
+        await evaluate(`
+            window.__originalFetch = window.fetch;
+            window.__live = {version:0,can_reply:true,owner_name:'CS Pertama',status:'OPEN',service_window_expires_at:'2099-01-01 00:00:00'};
+            window.__sendStatus = 409; window.__sendCount = 0;
+            window.fetch = async (url, options = {}) => {
+                if (options.method === 'POST') { window.__sendCount++; return Response.json({message:'Owner berubah',status:'SAVED'}, {status:window.__sendStatus}); }
+                return Response.json({selected:window.__live,messages:[]});
+            };
+            document.dispatchEvent(new Event('visibilitychange'));
+        `);
+        await delay(100);
+        await evaluate(`
+            const form=document.querySelector('[data-cc-composer]');
+            form.elements.text.value='Draft jangan hilang';form.elements.text.dispatchEvent(new Event('input'));
+            window.__draftKey='jm-crm-draft-'+document.body.dataset.uiUser+'-'+form.dataset.conversationId;
+            window.__live.version=1;window.__live.owner_name='CS Baru';
+            form.requestSubmit();
+        `);
+        await delay(150);
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.text.value`),'Draft jangan hilang');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.version.value`),'1');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-owner]').textContent`),'CS Baru');
+        assert.equal(await evaluate(`JSON.parse(sessionStorage.getItem(window.__draftKey)).text`),'Draft jangan hilang');
+        assert.equal(await evaluate(`window.__sendCount`),1,'Conflict must not automatically resend');
+        assert.ok(await evaluate(`document.querySelector('[data-cc-notice]').textContent.includes('Draft tetap tersimpan')`));
+        await evaluate(`window.__live.can_reply=false;document.dispatchEvent(new Event('visibilitychange'));`);
+        await delay(100);
+        assert.equal(await evaluate(`document.querySelector('.cc-compose-footer button').disabled`),true);
+        await evaluate(`window.__live.can_reply=true;document.dispatchEvent(new Event('visibilitychange'));`);
+        await delay(100);
+        await evaluate(`window.__sendStatus=202;window.__oldKey=document.querySelector('[data-cc-composer]').elements.client_key.value;document.querySelector('[data-cc-composer]').requestSubmit()`);
+        await delay(150);
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.text.value`),'');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.client_key.value !== window.__oldKey`),true);
+        await evaluate(`window.fetch=window.__originalFetch`);
         assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`), 'block');
         assert.equal(await evaluate(`document.querySelector('.crm-topbar').getBoundingClientRect().height`), 64);
         await send('Emulation.setDeviceMetricsOverride',{width:1366,height:768,deviceScaleFactor:1,mobile:false});
