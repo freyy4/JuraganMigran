@@ -411,7 +411,46 @@ class ConversationCrmController extends Controller
 
     public function settings(Request $request): View
     {
-        return view('conversation.settings', ['metaResume' => $request->user()->hasPermission('WHATSAPP_CONNECTION_MANAGE') ? DB::table('meta_auth_sessions')->where('user_id', $request->user()->id)->where('expires_at', '>', now())->whereNotIn('status', ['FAILED', 'DISCONNECTED'])->latest('created_at')->value('id') : null, 'metaTeams' => app(MetaConnectController::class)->teams(), 'stages' => DB::table('crm_stages')->orderBy('display_order')->get(), 'channels' => $request->user()->hasPermission('WHATSAPP_CONNECTION_VIEW') ? DB::table('whatsapp_channels')->where('provider', 'META_CLOUD_API')->get(['id', 'name', 'waba_id', 'phone_number_id', 'display_phone_number', 'status', 'team_id', 'routing_method', 'strict_owner', 'prefer_existing_owner', 'is_active', 'last_webhook_at', 'business_hours', 'last_error', 'connection_method', 'verified_name', 'quality_rating', 'webhook_ready', 'last_health_check_at', 'inbound_test_at', 'outbound_test_at', 'connected_at']) : collect(), 'tags' => DB::table('crm_tags')->get(), 'quickReplies' => DB::table('crm_quick_replies')->get(), 'templates' => $request->user()->hasPermission('crm.whatsapp_template.manage') ? DB::table('crm_whatsapp_templates')->get() : collect(), 'deadEvents' => $request->user()->hasPermission('crm.whatsapp.manage') ? DB::table('crm_webhook_events')->where('status', 'DEAD')->limit(20)->get(['id', 'error', 'created_at']) : collect(), 'diagnostics' => $request->user()->hasPermission('crm.whatsapp.manage') ? DB::table('crm_webhook_events')->select('status')->selectRaw('COUNT(*) as total')->groupBy('status')->pluck('total', 'status') : collect()]);
+        $user = $request->user();
+        $channelFields = ['id', 'name', 'provider', 'display_phone_number', 'status', 'team_id', 'routing_method', 'strict_owner', 'prefer_existing_owner', 'is_active', 'business_hours', 'last_webhook_at', 'last_error', 'connection_method', 'verified_name', 'quality_rating', 'webhook_ready', 'last_health_check_at', 'inbound_test_at', 'outbound_test_at', 'connected_at'];
+        if ($user->hasPermission('WHATSAPP_CONNECTION_ADVANCED')) {
+            $channelFields = array_merge($channelFields, ['waba_id', 'phone_number_id']);
+        }
+        $settingChannels = DB::table('whatsapp_channels')->whereNull('removed_at')
+            ->whereIn('provider', array_filter([
+                $user->hasPermission('WHATSAPP_CONNECTION_VIEW') ? 'META_CLOUD_API' : null,
+                $user->hasPermission('WHATSAPP_CHANNEL_VIEW') ? 'QR_WEB_SESSION' : null,
+            ]))->get($channelFields);
+        $channels = $settingChannels->where('provider', 'META_CLOUD_API')->values();
+        $stages = DB::table('crm_stages')->orderBy('display_order')->orderBy('id')->get();
+        $stageCounts = $this->crm->leads($request)->whereNull('archived_at')->groupBy('crm_stage')->selectRaw('crm_stage, COUNT(*) as total')->pluck('total', 'crm_stage');
+        $agents = User::where('is_active', true)->get()->filter(fn (User $agent): bool => $agent->hasPermission('crm.conversation.reply'));
+        if (! collect(app(AccessPolicy::class)->policies($user, 'crm.routing.manage'))->contains('scope', 'OPERATIONAL_ALL')) {
+            $agents = $agents->filter(fn (User $agent): bool => $user->team_id && $agent->team_id === $user->team_id);
+        }
+
+        return view('conversation.settings', [
+            'settingChannels' => $settingChannels, 'channels' => $channels, 'stages' => $stages, 'stageCounts' => $stageCounts,
+            'agents' => $agents, 'agentProfiles' => DB::table('crm_agent_profiles')->whereIn('user_id', $agents->pluck('id'))->get()->keyBy('user_id'),
+            'metaResume' => $user->hasPermission('WHATSAPP_CONNECTION_MANAGE') ? DB::table('meta_auth_sessions')->where('user_id', $user->id)->where('expires_at', '>', now())->whereNotIn('status', ['FAILED', 'DISCONNECTED'])->latest('created_at')->value('id') : null,
+            'metaTeams' => app(MetaConnectController::class)->teams(),
+            'tags' => DB::table('crm_tags')->select('crm_tags.*')->selectSub(DB::table('crm_lead_tags')->whereColumn('tag_id', 'crm_tags.id')->selectRaw('COUNT(*)'), 'usage_count')->orderBy('name')->get(),
+            'quickReplies' => DB::table('crm_quick_replies')->orderBy('name')->get(),
+            'templates' => $user->hasPermission('crm.whatsapp_template.manage') ? DB::table('crm_whatsapp_templates')->whereIn('channel_id', $channels->pluck('id'))->get() : collect(),
+            'deadEvents' => $user->hasPermission('WHATSAPP_CONNECTION_ADVANCED') ? DB::table('crm_webhook_events')->where('status', 'DEAD')->limit(20)->get(['id', 'error', 'created_at']) : collect(),
+        ]);
+    }
+
+    public function saveAgent(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['user_id' => 'required|integer|exists:users,id', 'availability' => 'required|in:ONLINE,BUSY,AWAY,OFFLINE', 'conversation_cap' => 'required|integer|min:1|max:200']);
+        $agent = User::findOrFail($data['user_id']);
+        $all = collect(app(AccessPolicy::class)->policies($request->user(), 'crm.routing.manage'))->contains('scope', 'OPERATIONAL_ALL');
+        abort_unless($agent->is_active && $agent->hasPermission('crm.conversation.reply') && ($all || ($request->user()->team_id && $agent->team_id === $request->user()->team_id)), 403);
+        DB::table('crm_agent_profiles')->updateOrInsert(['user_id' => $agent->id], ['availability' => $data['availability'], 'conversation_cap' => $data['conversation_cap'], 'updated_at' => now()]);
+        app(AccessPolicy::class)->audit($request->user(), 'crm.agent_configured', $data);
+
+        return back()->with('success', 'Ketersediaan dan kapasitas CS diperbarui.');
     }
 
     public function connectStart(Request $request): JsonResponse
@@ -618,17 +657,32 @@ class ConversationCrmController extends Controller
 
     public function saveTag(Request $request): RedirectResponse
     {
-        $data = $request->validate(['name' => 'required|string|max:60|unique:crm_tags,name', 'category' => 'required|in:PROGRAM,COUNTRY,ENGAGEMENT', 'color_token' => 'required|in:blue,green,amber,purple']);
-        abort_if(preg_match('/(hiv|hepatitis|hamil|diagnos|penyakit|medis|mcu|utang|hutang|gaji|insiden|incident|saldo)/iu', $data['name']), 422, 'Tag CRM hanya untuk program, negara, dan interaksi. Gunakan modul terlindungi untuk data sensitif.');
-        DB::table('crm_tags')->insert($data + ['created_at' => now(), 'updated_at' => now()]);
-        app(AccessPolicy::class)->audit($request->user(), 'crm.tag_created');
+        $data = $request->validate([
+            'id' => 'nullable|integer|exists:crm_tags,id',
+            'name' => ['required', 'string', 'max:60', Rule::unique('crm_tags', 'name')->ignore($request->input('id'))],
+            'category' => 'required|in:PROGRAM,COUNTRY,PRIORITY,ENGAGEMENT,SOURCE',
+            'color_token' => 'required|in:blue,green,amber,purple', 'is_active' => 'sometimes|boolean',
+        ]);
+        abort_if(preg_match('/(hiv|hepatitis|hamil|diagnos|penyakit|medis|mcu|utang|hutang|gaji|insiden|incident|saldo)/iu', $data['name']), 422, 'Tag CRM hanya untuk klasifikasi umum. Gunakan modul terlindungi untuk data sensitif.');
+        $id = $data['id'] ?? null;
+        unset($data['id']);
+        if ($id) {
+            DB::table('crm_tags')->where('id', $id)->update($data + ['updated_at' => now()]);
+        } else {
+            $id = DB::table('crm_tags')->insertGetId($data + ['created_at' => now(), 'updated_at' => now()]);
+        }
+        app(AccessPolicy::class)->audit($request->user(), $request->filled('id') ? 'crm.tag_updated' : 'crm.tag_created', ['tag_id' => $id]);
 
-        return back()->with('success', 'Tag disimpan.');
+        return back()->with('success', 'Tag disimpan. Riwayat penggunaan tetap tersimpan.');
     }
 
     public function saveQuickReply(Request $request): RedirectResponse
     {
         $data = $request->validate(['name' => 'required|string|max:80', 'body' => 'required|string|max:4096']);
+        preg_match_all('/\{\{\s*([^{}]+?)\s*\}\}/u', $data['body'], $matches);
+        if (array_diff(array_map('trim', $matches[1]), \App\Services\CrmQuickReply::VARIABLES)) {
+            throw ValidationException::withMessages(['body' => 'Variabel yang didukung: {{nama}}, {{program}}, {{negara}}, {{nama_cs}}.']);
+        }
         DB::table('crm_quick_replies')->insert($data + ['created_at' => now(), 'updated_at' => now()]);
         app(AccessPolicy::class)->audit($request->user(), 'crm.quick_reply_created');
 

@@ -239,6 +239,7 @@ class AccessPolicy
                 'test-channel' => 'WHATSAPP_CONNECTION_TEST',
                 'save-stage', 'create-stage', 'reorder-stages' => 'crm.pipeline.manage',
                 'sync-templates' => 'crm.whatsapp_template.manage', 'save-tag' => 'crm.tag.manage',
+                'save-agent' => 'crm.routing.manage',
                 'save-quick-reply' => 'crm.quick_reply.manage', 'retry-message', 'availability' => 'crm.conversation.reply',
                 default => null,
             };

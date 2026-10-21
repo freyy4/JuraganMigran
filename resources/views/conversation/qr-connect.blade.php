@@ -2,16 +2,21 @@
 @push('styles')<link rel="stylesheet" href="{{ asset('css/whatsapp-qr.css').'?v='.filemtime(public_path('css/whatsapp-qr.css')) }}">@endpush
 @push('scripts')<script src="{{ asset('js/whatsapp-qr.js').'?v='.filemtime(public_path('js/whatsapp-qr.js')) }}" defer></script>@endpush
 @php
-$qrOptions = ['base'=>url('/api/whatsapp'), 'token'=>csrf_token(), 'inbox'=>route('crm.inbox'), 'teams'=>$metaTeams,
+$qrOptions = ['compact'=>(bool)($settingsCompact ?? false), 'base'=>url('/api/whatsapp'), 'token'=>csrf_token(), 'inbox'=>route('crm.inbox'), 'teams'=>$metaTeams,
 'connect'=>auth()->user()->hasPermission('WHATSAPP_CHANNEL_CONNECT_QR'), 'rescan'=>auth()->user()->hasPermission('WHATSAPP_CHANNEL_RESCAN'),
 'disconnect'=>auth()->user()->hasPermission('WHATSAPP_CHANNEL_DISCONNECT'), 'routing'=>auth()->user()->hasPermission('WHATSAPP_CHANNEL_MANAGE_ROUTING'),
 'migrate'=>auth()->user()->hasPermission('WHATSAPP_CONNECTION_MANAGE') && auth()->user()->hasPermission('WHATSAPP_CHANNEL_DISCONNECT'), 'diagnostics'=>auth()->user()->hasPermission('WHATSAPP_CHANNEL_DIAGNOSTICS')];
 @endphp
 <script id="whatsapp-qr-config" type="application/json">@json($qrOptions)</script>
 <section class="cc-panel qr-workspace" data-qr-root>
+@if($settingsCompact ?? false)
+<header class="sc-provider-head"><span class="sc-brand sc-whatsapp"><x-ui-icon name="whatsapp"/></span><div><h3>WhatsApp (QR)</h3><p>Tautkan WhatsApp Business untuk digunakan bersama tim.</p></div><button type="button" class="sc-icon-button secondary" data-qr-help aria-label="Panduan koneksi QR"><x-ui-icon name="help"/></button></header>
+@if(auth()->user()->hasPermission('WHATSAPP_CHANNEL_CONNECT_QR'))<details class="sc-qr-create"><summary class="button">+ Hubungkan WhatsApp QR</summary><form data-qr-create><label>Nama channel<input name="name" maxlength="100" required placeholder="JM - CS Utama" value="JM - CS Utama"></label><button>Tampilkan QR</button></form></details>@endif
+@else
 <header><div><span class="qr-badge">Mulai Cepat · Compatibility Mode</span><h2>Scan QR WhatsApp Business</h2><p>Tautkan satu akun WhatsApp Business untuk digunakan bersama tim CS di Inbox CRM.</p></div><button type="button" class="secondary" data-qr-help>？ Panduan QR</button></header>
 <p class="qr-provider-copy">QR adalah jalur compatibility. Untuk koneksi API resmi, pilih <a href="#meta-cloud-option">Meta Cloud API</a> di bawah.</p>
 @if(auth()->user()->hasPermission('WHATSAPP_CHANNEL_CONNECT_QR'))<form data-qr-create><label>Nama channel<input name="name" maxlength="100" required placeholder="JM - CS Utama" value="JM - CS Utama"></label><button>Tampilkan QR</button></form>@endif
+@endif
 <p data-qr-feedback role="status" aria-live="polite"></p><div class="qr-channels" data-qr-channels></div>
 <section data-qr-pair hidden aria-label="Tautkan WhatsApp dengan QR"><h3>Tautkan WhatsApp Business</h3><p>Buka WhatsApp Business → Perangkat tertaut → Tautkan perangkat, lalu scan QR ini.</p><p class="qr-mobile-hint">Untuk scan paling mudah, buka halaman ini di komputer/tablet dan gunakan HP utama Anda.</p><div class="qr-image-box"><img data-qr-image hidden alt="QR untuk menautkan akun WhatsApp Business" referrerpolicy="no-referrer"><p data-qr-pair-state role="status"></p></div><p data-qr-countdown aria-live="off"></p><div class="actions"><button type="button" class="secondary" data-qr-refresh>Buat QR Baru</button><button type="button" class="secondary" data-qr-pause>Tutup QR</button></div></section>
 <section data-qr-settings hidden><h3>Tim CS & routing</h3><p data-qr-account></p><form data-qr-routing><label>Tim penerima<select name="team_id"><option value="">Antrean umum</option>@foreach($metaTeams as $team)<option value="{{ $team['id'] }}">{{ $team['name'] }} · {{ $team['members'] }} CS aktif</option>@endforeach</select></label><label>Metode pembagian<select name="routing_method"><option value="ROUND_ROBIN">Round Robin</option><option value="LEAST_ACTIVE">Percakapan aktif paling sedikit</option><option value="MANUAL">Antrean manual</option></select></label><label class="check"><input type="checkbox" name="prefer_existing_owner" checked>Utamakan owner yang sudah menangani lead</label><label class="check"><input type="checkbox" name="strict_owner" checked>Hanya owner aktif dapat membalas</label><div class="grid"><label>Mulai layanan (WIB)<input type="time" name="hours_start"></label><label>Selesai layanan (WIB)<input type="time" name="hours_end"></label></div><button>Aktifkan Channel</button></form></section>

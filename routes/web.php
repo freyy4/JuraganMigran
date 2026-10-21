@@ -146,6 +146,7 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     }
     Route::post('crm/leads/{lead}/followups/{followup}', [ConversationCrmController::class, 'finishFollowUp'])->whereNumber(['lead', 'followup'])->name('crm.finish-followup');
     Route::post('crm/pipeline/views', [ConversationCrmController::class, 'savedView'])->name('crm.saved-view');
+    Route::post('settings/crm/agents', [ConversationCrmController::class, 'saveAgent'])->name('crm.save-agent');
     Route::get('settings/crm', [ConversationCrmController::class, 'settings'])->name('crm.settings');
     Route::post('settings/crm/channels', [ConversationCrmController::class, 'channel'])->name('crm.channel');
     Route::post('settings/crm/channels/{channel}/test', [ConversationCrmController::class, 'testChannel'])->whereNumber('channel')->name('crm.test-channel');

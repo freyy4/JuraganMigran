@@ -3,7 +3,7 @@
 @push('scripts')<script src="{{ asset('js/meta-connect.js').'?v='.filemtime(public_path('js/meta-connect.js')) }}" defer></script>@endpush
 @php
     $metaOptions = [
-        'base'=>url('/api/integrations/whatsapp'), 'settings'=>route('crm.settings'), 'inbox'=>route('crm.inbox'),
+        'compact'=>(bool)($settingsCompact ?? false), 'base'=>url('/api/integrations/whatsapp'), 'settings'=>route('crm.settings'), 'inbox'=>route('crm.inbox'),
         'token'=>csrf_token(), 'resume'=>$metaResume, 'teams'=>$metaTeams,
         'manage'=>auth()->user()->hasPermission('WHATSAPP_CONNECTION_MANAGE'),
         'test'=>auth()->user()->hasPermission('WHATSAPP_CONNECTION_TEST'),
@@ -13,8 +13,13 @@
 @endphp
 <script type="application/json" id="meta-connect-config">@json($metaOptions)</script>
 <section class="cc-panel mc-connection" data-meta-connect>
+    @if($settingsCompact ?? false)
+    <header class="sc-provider-head"><span class="sc-brand sc-meta" aria-label="Meta">∞</span><div><h3>WhatsApp Business API</h3><p>Hubungkan dengan Meta Cloud API untuk skala lebih besar.</p></div><button type="button" class="sc-icon-button secondary" data-mc-guide aria-label="Panduan Meta"><x-ui-icon name="help"/></button></header>
+    @if($channels->isEmpty())<span class="sc-pill neutral">Belum terhubung</span><ul class="sc-benefits"><li><x-ui-icon name="check"/> Nomor WhatsApp Business resmi</li><li><x-ui-icon name="check"/> Cocok untuk layanan banyak tim</li><li><x-ui-icon name="check"/> Mendukung template WhatsApp resmi</li></ul>@endif
+    @else
     <header><div><small>API RESMI · DIREKOMENDASIKAN UNTUK JANGKA PANJANG</small><h2>Channel WhatsApp Business</h2><p>Terima pesan dan layani calon pekerja bersama tim CS di CRM.</p></div><button type="button" class="secondary" data-mc-guide>？ Lihat Panduan</button></header>
     <div class="cc-coach" data-cc-coach="meta-connect"><p>Login dengan Meta, pilih bisnis dan nomor, lalu uji pesan sebelum mengaktifkan channel.</p><button type="button" class="secondary" data-cc-dismiss-coach>Mengerti</button></div>
+    @endif
     @if(auth()->user()->hasPermission('WHATSAPP_CONNECTION_MANAGE'))
     <button type="button" data-mc-start>Hubungkan dengan Meta</button><p>Masuk dengan akun Meta yang memiliki akses ke WhatsApp Business Juragan Migran. ID dan credential teknis diatur otomatis oleh sistem.</p>
     <button type="button" class="secondary" data-mc-resume hidden>Lanjutkan pengaturan terakhir</button>
