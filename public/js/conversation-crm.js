@@ -80,7 +80,8 @@
     });
     const composer = document.querySelector('[data-cc-composer]');
     if (composer) {
-        const mode = composer.elements.mode;
+        const mode = composer.querySelector('[data-cc-mode-select]');
+        const submittedMode = composer.elements.mode;
         const textArea = composer.elements.text;
         const grow = () => { textArea.style.height = 'auto'; textArea.style.height = Math.min(120, Math.max(48, textArea.scrollHeight)) + 'px'; };
         textArea.addEventListener('input', grow); grow();
@@ -94,8 +95,13 @@
             else mode.value = 'text';
             render();
         }));
-        composer.querySelector('[data-cc-official]')?.addEventListener('click', () => { mode.value = 'template'; activeTab = 'quick'; render(); });
+        composer.querySelector('[data-cc-official]')?.addEventListener('click', () => { if (mode.querySelector('option[value=template]').disabled) return; mode.value = 'template'; activeTab = 'quick'; render(); });
         const render = () => {
+            if (!mode.value || mode.selectedOptions[0]?.disabled) {
+                mode.value = mode.querySelector('option:not([disabled])').value;
+                activeTab = mode.value === 'template' ? 'quick' : mode.value;
+            }
+            submittedMode.value = mode.value;
             composer.querySelectorAll('[data-cc-mode]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.ccMode === activeTab)); button.disabled = ['text','attachment'].includes(button.dataset.ccMode) && mode.querySelector('option[value=text]').disabled; });
             const quick = composer.querySelector('[data-cc-quick-panel]');
             if (quick) quick.hidden = activeTab !== 'quick';
@@ -118,6 +124,7 @@
                 label.append(input); variables.append(label);
             }
         };
+        composer.addEventListener('submit', () => { submittedMode.value = mode.value; });
         mode.addEventListener('change', () => { activeTab = mode.value === 'template' ? 'quick' : mode.value; render(); }); template.addEventListener('change', render); render();
         composer.querySelector('[data-cc-quick]').addEventListener('change', event => { if (mode.value === 'text' && event.target.value) composer.elements.text.value = event.target.value; });
     }

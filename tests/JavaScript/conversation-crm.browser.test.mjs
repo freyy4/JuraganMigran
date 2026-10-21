@@ -67,6 +67,7 @@ test('CRM inbox supports compact responsive panes, visible composer, internal no
         assert.equal(await evaluate(`document.querySelector('[data-cc-attachment]').hidden`), false);
         await evaluate(`document.querySelector('[data-cc-mode="note"]').click()`);
         assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.mode.value`), 'note');
+        assert.equal(await evaluate(`new FormData(document.querySelector('[data-cc-composer]')).get('mode')`), 'note', 'Composer must submit the active mode');
         assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.attachment.disabled`), true);
         await evaluate(`document.querySelector('[data-cc-inspector]').click()`);
         assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`), 'none');
@@ -76,7 +77,7 @@ test('CRM inbox supports compact responsive panes, visible composer, internal no
         await evaluate(`document.querySelector('[data-cc-open="cc-help"]').click()`);
         assert.equal(await evaluate(`document.getElementById('cc-help').open`), true);
         await evaluate(`document.querySelector('#cc-help [data-cc-close]').click()`);
-        await evaluate(`document.querySelector('[data-cc-composer]').elements.mode.value='note';document.querySelector('[data-cc-composer]').elements.mode.dispatchEvent(new Event('change'))`);
+        await evaluate(`document.querySelector('[data-cc-mode-select]').value='note';document.querySelector('[data-cc-mode-select]').dispatchEvent(new Event('change'))`);
         assert.equal(await evaluate(`document.querySelector('[data-cc-text]').hidden`), false);
         assert.equal(await evaluate(`document.querySelector('[data-cc-template]').hidden`), true);
         await send('Emulation.setDeviceMetricsOverride',{width:900,height:1000,deviceScaleFactor:1,mobile:false});
