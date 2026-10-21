@@ -62,7 +62,7 @@ class WhatsAppQrGatewayTest extends TestCase
 
     public function test_both_connection_choices_render_and_gateway_is_not_faked_when_unconfigured(): void
     {
-        $page = $this->get(route('crm.settings'))->assertOk()->assertSee('Scan QR WhatsApp Business')->assertSee('Hubungkan dengan Meta')->assertSee('Compatibility Mode')->assertDontSee('gateway-secret');
+        $page = $this->get(route('crm.settings'))->assertOk()->assertSee('WhatsApp (QR)')->assertSee('Hubungkan dengan Meta')->assertSee('data-qr-root', false)->assertDontSee('gateway-secret');
         if ($directory = getenv('QR_QA_FIXTURES')) {
             if (! is_dir($directory)) {
                 mkdir($directory, 0775, true);

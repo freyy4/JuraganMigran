@@ -39,6 +39,12 @@
                 if (answer !== 'disconnect') return;
                 const result = await request('/'+row.id+'/disconnect',{confirm:true}); updateChannel(result.channel); wizard.hidden = true; clearInterval(timer); status.textContent = 'Channel diputuskan. Riwayat chat tetap tersimpan.';
             },true));
+            if (config.compact) {
+                const overflow = element('details',null,'sc-channel-overflow'), summary = element('summary','⋮'); summary.setAttribute('aria-label','Aksi channel Meta'); overflow.append(summary);
+                const options = element('div');
+                for (const action of [...actions.children]) { if (action.tagName !== 'A' && action.textContent !== 'Tim & routing') options.append(action); }
+                if (options.children.length) { overflow.append(options); actions.append(overflow); }
+            }
             card.append(actions); list.append(card);
         }
     }

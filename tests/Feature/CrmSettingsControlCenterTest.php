@@ -31,7 +31,7 @@ class CrmSettingsControlCenterTest extends TestCase
         $this->channel();
         $admin = $this->admin('admin_operations');
         $view = $this->actingAs($admin)->get(route('crm.settings', ['tab' => 'tags']))->assertOk()
-            ->assertSee('Pengaturan CRM')->assertSee('Panduan &amp; Tips', false)
+            ->assertSee('Pengaturan CRM')->assertSee('Panduan & Tips', false)
             ->assertSee('data-sc-section="tags"', false)->assertSee('data-sc-section="automation"', false)
             ->assertSee('data-initial-tab="tags"', false)->assertDontSee('never-show-this-token')
             ->assertDontSee('888899991111')->assertDontSee('444455556666')->assertDontSee('Advanced · Developer Setup');

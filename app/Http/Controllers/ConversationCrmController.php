@@ -8,6 +8,7 @@ use App\Services\AttributionService;
 use App\Services\ConversationCrm;
 use App\Services\ConversionService;
 use App\Services\CrmLeadQuery;
+use App\Services\CrmQuickReply;
 use App\Services\CsRouter;
 use App\Services\DocumentScanner;
 use App\Services\LeadUpsertService;
@@ -411,6 +412,7 @@ class ConversationCrmController extends Controller
 
     public function settings(Request $request): View
     {
+        $request->validate(['tab' => 'sometimes|nullable|string|in:channel,routing,tags,replies,pipeline,templates,automation']);
         $user = $request->user();
         $channelFields = ['id', 'name', 'provider', 'display_phone_number', 'status', 'team_id', 'routing_method', 'strict_owner', 'prefer_existing_owner', 'is_active', 'business_hours', 'last_webhook_at', 'last_error', 'connection_method', 'verified_name', 'quality_rating', 'webhook_ready', 'last_health_check_at', 'inbound_test_at', 'outbound_test_at', 'connected_at'];
         if ($user->hasPermission('WHATSAPP_CONNECTION_ADVANCED')) {
@@ -436,7 +438,7 @@ class ConversationCrmController extends Controller
             'metaTeams' => app(MetaConnectController::class)->teams(),
             'tags' => DB::table('crm_tags')->select('crm_tags.*')->selectSub(DB::table('crm_lead_tags')->whereColumn('tag_id', 'crm_tags.id')->selectRaw('COUNT(*)'), 'usage_count')->orderBy('name')->get(),
             'quickReplies' => DB::table('crm_quick_replies')->orderBy('name')->get(),
-            'templates' => $user->hasPermission('crm.whatsapp_template.manage') ? DB::table('crm_whatsapp_templates')->whereIn('channel_id', $channels->pluck('id'))->get() : collect(),
+            'templates' => $user->hasPermission('crm.whatsapp_template.manage') ? DB::table('crm_whatsapp_templates')->whereIn('channel_id', $channels->pluck('id'))->get(['id', 'channel_id', 'name', 'language', 'category', 'status', 'last_synced_at']) : collect(),
             'deadEvents' => $user->hasPermission('WHATSAPP_CONNECTION_ADVANCED') ? DB::table('crm_webhook_events')->where('status', 'DEAD')->limit(20)->get(['id', 'error', 'created_at']) : collect(),
         ]);
     }
@@ -680,7 +682,7 @@ class ConversationCrmController extends Controller
     {
         $data = $request->validate(['name' => 'required|string|max:80', 'body' => 'required|string|max:4096']);
         preg_match_all('/\{\{\s*([^{}]+?)\s*\}\}/u', $data['body'], $matches);
-        if (array_diff(array_map('trim', $matches[1]), \App\Services\CrmQuickReply::VARIABLES)) {
+        if (array_diff(array_map('trim', $matches[1]), CrmQuickReply::VARIABLES)) {
             throw ValidationException::withMessages(['body' => 'Variabel yang didukung: {{nama}}, {{program}}, {{negara}}, {{nama_cs}}.']);
         }
         DB::table('crm_quick_replies')->insert($data + ['created_at' => now(), 'updated_at' => now()]);
