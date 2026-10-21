@@ -107,6 +107,7 @@ class CrmPipelineWorkspaceTest extends TestCase
         $this->putJson(route('crm.card-layout'), ['scope' => 'TEAM', 'version' => 0, 'fields' => []])->assertForbidden();
         $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 1, 'fields' => ['phone', 'owner']])->assertOk()->assertJsonPath('fields', ['phone', 'owner']);
         $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 2, 'fields' => ['avatar', 'source', 'owner', 'tags', 'followup', 'activity', 'message', 'interest', 'phone']])->assertUnprocessable();
+        $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 2, 'fields' => ['avatar', 'source', 'owner', 'tags', 'followup', 'activity', 'message', 'phone']])->assertUnprocessable();
         $this->actingAs($other)->getJson(route('crm.card-layout'))->assertOk()->assertJsonPath('version', 0);
     }
 

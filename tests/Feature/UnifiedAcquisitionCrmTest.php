@@ -231,7 +231,7 @@ class UnifiedAcquisitionCrmTest extends TestCase
         $lead = app(LeadUpsertService::class)->upsert('Siti', '081234567890');
         $this->postJson(route('crm.move', $lead->id), ['stage' => 'CONVERTED', 'version' => 0])->assertUnprocessable();
         $this->assertDatabaseCount('candidates', 0);
-        $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 0, 'fields' => ['interest', 'message', 'owner', 'avatar', 'source', 'tags', 'followup', 'activity']])->assertOk()->assertJsonPath('fields.0', 'interest');
+        $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 0, 'fields' => ['interest', 'message', 'owner', 'avatar', 'source', 'tags', 'followup']])->assertOk()->assertJsonPath('fields.0', 'interest');
         $this->get(route('crm.pipeline'))->assertOk()->assertSee('Pratinjau kartu')->assertSee('Cari duplikat');
     }
 

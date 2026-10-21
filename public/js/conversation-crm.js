@@ -1,10 +1,32 @@
 (() => {
     document.querySelectorAll('[data-cc-open]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.ccOpen)?.showModal()));
     document.querySelectorAll('[data-cc-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+    const timeline = document.querySelector('[data-cc-timeline]');
+    let activityFilter = 'all';
+    const filterTimeline = () => timeline?.querySelectorAll('[data-cc-activity-day]').forEach(day => {
+        const rows = [...day.querySelectorAll('[data-cc-activity]')];
+        const matching = rows.filter(row => activityFilter === 'all' || row.dataset.ccActivity === activityFilter);
+        rows.forEach(row => row.hidden = !matching.includes(row) || (!day.dataset.expanded && matching.indexOf(row) >= 3));
+        day.hidden = matching.length === 0;
+        const expand = day.querySelector('[data-cc-activity-expand]');
+        expand.hidden = matching.length <= 3;
+        expand.textContent = day.dataset.expanded ? 'Ringkas aktivitas' : `Lihat ${matching.length - 3} aktivitas lainnya`;
+    });
+    document.querySelectorAll('[data-cc-activity-filter]').forEach(button => button.addEventListener('click', () => {
+        activityFilter = button.dataset.ccActivityFilter;
+        document.querySelectorAll('[data-cc-activity-filter]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+        timeline.querySelectorAll('[data-cc-activity-day]').forEach(day => delete day.dataset.expanded);
+        filterTimeline();
+    }));
+    timeline?.querySelectorAll('[data-cc-activity-expand]').forEach(button => button.addEventListener('click', () => {
+        const day = button.closest('[data-cc-activity-day]');
+        if (day.dataset.expanded) delete day.dataset.expanded; else day.dataset.expanded = 'true';
+        filterTimeline();
+    }));
     const workspace = document.querySelector('.cc-inbox');
     const inspector = workspace?.querySelector('.cc-inspector');
     const inspectorKey = `jm-crm-${document.body.dataset.uiUser}-inspector-collapsed`;
-    const inspectorDesktop = matchMedia('(min-width:1200px)');
+    const inspectorDesktop = matchMedia('(min-width:1440px)');
     const syncInspector = () => {
         const open = inspectorDesktop.matches ? !workspace?.classList.contains('rail-collapsed') : inspector?.classList.contains('is-open');
         document.querySelectorAll('[data-cc-inspector]').forEach(button => button.setAttribute('aria-expanded', String(!!open)));
@@ -148,6 +170,22 @@
     }
     const board = document.querySelector('[data-cc-board]');
     if (board) {
+        let pan = null;
+        board.addEventListener('pointerdown', event => {
+            if (event.button !== 0 || event.pointerType === 'touch' || event.target.closest('.cc-lead-card,a,button,input,select,textarea,summary,dialog')) return;
+            pan = {id:event.pointerId,x:event.clientX,scroll:board.scrollLeft,active:false};
+        });
+        board.addEventListener('pointermove', event => {
+            if (!pan || pan.id !== event.pointerId) return;
+            if (!pan.active && Math.abs(event.clientX - pan.x) < 5) return;
+            pan.active = true; board.setPointerCapture(event.pointerId); board.classList.add('is-panning');
+            event.preventDefault(); board.scrollLeft = pan.scroll - (event.clientX - pan.x);
+        });
+        const stopPan = () => { pan = null; board.classList.remove('is-panning'); };
+        board.addEventListener('pointerup', stopPan);
+        board.addEventListener('pointercancel', stopPan);
+        board.addEventListener('lostpointercapture', stopPan);
+        window.addEventListener('pointerup', stopPan);
         const select = document.createElement('select'); select.className = 'cc-mobile-stages'; select.setAttribute('aria-label', 'Tahap pipeline mobile');
         board.querySelectorAll('[data-stage]').forEach((column, index) => { const option = new Option(column.querySelector('h2').textContent, column.dataset.stage); select.append(option); column.classList.toggle('mobile-active', index === 0); });
         const style = document.createElement('style'); style.textContent = '.cc-mobile-stages{display:none}@media(max-width:767px){.cc-mobile-stages{display:block;width:100%;min-height:44px;margin:12px 0}}'; document.head.append(style);

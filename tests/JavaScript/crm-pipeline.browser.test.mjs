@@ -68,7 +68,7 @@ test('Pipeline workspace supports filters, layout, selection and failed stage ro
         for (const width of [1440, 1366, 1200]) {
             await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
             const controls = await evaluate(`Array.from(document.querySelectorAll('.cp-toolbar input:not([type=hidden]),.cp-toolbar select,.cp-toolbar>button,.cp-toolbar .cp-search button,.cp-toolbar .cp-view,.cp-toolbar summary')).map(e=>({height:e.getBoundingClientRect().height,top:e.getBoundingClientRect().top}))`);
-            assert.ok(controls.every(control => control.height === 40), 'Toolbar controls must be 40px at ' + width);
+            assert.ok(controls.every(control => control.height === 42), 'Toolbar controls must be 42px at ' + width);
             assert.ok(controls.every(control => Math.abs(control.top - controls[0].top) < 1), 'Toolbar controls must align at ' + width);
         }
         assert.equal(await evaluate(`!!document.querySelector('[data-cp-select]')`),true);

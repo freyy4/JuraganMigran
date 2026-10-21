@@ -1,6 +1,11 @@
 (() => {
     const root = document.querySelector('[data-cp-user]');
     if (!root) return;
+    document.querySelectorAll('.cp-menu').forEach(menu => {
+        menu.addEventListener('click', event => { if (event.target.closest('button,a')) menu.open = false; });
+        document.addEventListener('click', event => { if (!menu.contains(event.target)) menu.open = false; });
+        menu.addEventListener('keydown', event => { if (event.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); } });
+    });
     const preferenceKey = `jm-crm-${root.dataset.cpUser}-pipeline-view`;
     const currentFilters = JSON.parse(root.dataset.cpFilters);
     const pageUrl = new URL(location.href);
@@ -63,8 +68,8 @@
         } catch (error) { layoutFeedback.textContent = error.message; }
     };
     fields.forEach(input => input.addEventListener('change', () => {
-        if (fields.filter(field => field.checked).length > 8) {
-            input.checked = false; layoutFeedback.textContent = 'Pilih maksimal 8 informasi. Nama lead selalu tampil.';
+        if (fields.filter(field => field.checked).length > 7) {
+            input.checked = false; layoutFeedback.textContent = 'Pilih maksimal 7 informasi. Nama lead selalu tampil.';
         } else layoutFeedback.textContent = '';
         apply();
     }));
