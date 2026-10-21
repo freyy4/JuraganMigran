@@ -84,6 +84,13 @@ test(process.env.CRM_INSPECTOR_ONLY === '1' ? 'Visible CRM inspector controls re
             }
             return;
         }
+        assert.equal(await evaluate(`document.querySelector('[data-cc-compose-menu]').open`),false);
+        await evaluate(`document.querySelector('[data-cc-compose-menu] summary').click()`);
+        assert.equal(await evaluate(`document.querySelector('[data-cc-compose-menu]').open`),true);
+        await evaluate(`document.querySelector('[data-cc-mode="note"]').click()`);
+        assert.equal(await evaluate(`document.querySelector('[data-cc-compose-menu]').open`),false);
+        assert.equal(await evaluate(`document.querySelector('.cc-compose-footer button').textContent`),'Simpan catatan');
+        await evaluate(`document.querySelector('[data-cc-compose-menu] summary').click();document.querySelector('[data-cc-mode="text"]').click()`);
         await evaluate(`
             window.__originalFetch = window.fetch;
             window.__live = {version:0,can_reply:true,owner_name:'CS Pertama',status:'OPEN',service_window_expires_at:'2099-01-01 00:00:00'};

@@ -94,6 +94,8 @@
             else if (activeTab === 'quick') mode.value = 'template';
             else mode.value = 'text';
             render();
+            composer.querySelector('[data-cc-compose-menu]').open = false;
+            textArea.focus();
         }));
         composer.querySelector('[data-cc-official]')?.addEventListener('click', () => { if (mode.querySelector('option[value=template]').disabled) return; mode.value = 'template'; activeTab = 'quick'; render(); });
         const render = () => {
@@ -102,11 +104,12 @@
                 activeTab = mode.value === 'template' ? 'quick' : mode.value;
             }
             submittedMode.value = mode.value;
+            composer.querySelector('.cc-compose-footer button').textContent = mode.value === 'note' ? 'Simpan catatan' : 'Kirim';
             composer.querySelectorAll('[data-cc-mode]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.ccMode === activeTab)); button.disabled = ['text','attachment'].includes(button.dataset.ccMode) && mode.querySelector('option[value=text]').disabled; });
             const quick = composer.querySelector('[data-cc-quick-panel]');
             if (quick) quick.hidden = activeTab !== 'quick';
             composer.querySelector('[data-cc-template]').hidden = mode.value !== 'template';
-            composer.querySelector('[data-cc-text]').hidden = mode.value === 'template' || activeTab === 'attachment';
+            composer.querySelector('[data-cc-text]').hidden = mode.value === 'template';
             composer.classList.toggle('is-internal', activeTab === 'note');
             textArea.placeholder = activeTab === 'note' ? 'Catatan internal · hanya terlihat di CRM…' : 'Ketik pesan…';
             const attachment = composer.querySelector('[data-cc-attachment]');
@@ -124,6 +127,9 @@
                 label.append(input); variables.append(label);
             }
         };
+        const composeMenu = composer.querySelector('[data-cc-compose-menu]');
+        document.addEventListener('click', event => { if (!composeMenu.contains(event.target)) composeMenu.open = false; });
+        composeMenu.addEventListener('keydown', event => { if (event.key === 'Escape') { composeMenu.open = false; composeMenu.querySelector('summary').focus(); } });
         composer.addEventListener('submit', () => { submittedMode.value = mode.value; });
         mode.addEventListener('change', () => { activeTab = mode.value === 'template' ? 'quick' : mode.value; render(); }); template.addEventListener('change', render); render();
         composer.querySelector('[data-cc-quick]').addEventListener('change', event => { if (mode.value === 'text' && event.target.value) composer.elements.text.value = event.target.value; });
@@ -163,7 +169,14 @@
     const messages = document.querySelector('.cc-messages'); if (messages && !new URLSearchParams(location.search).has('before')) messages.scrollTop = messages.scrollHeight;
     const inbox = document.querySelector('[data-cc-inbox]');
     const notice = document.querySelector('[data-cc-notice]');
-    const notify = text => { if (notice) { notice.textContent = text; notice.hidden = !text; } };
+    let noticeTimer;
+    const notify = (text, temporary = false) => {
+        clearTimeout(noticeTimer);
+        if (notice) {
+            notice.textContent = text; notice.hidden = !text;
+            if (temporary) noticeTimer = setTimeout(() => { notice.hidden = true; }, 4000);
+        }
+    };
     let sending = false;
     let canReply = true;
     let refreshConversation = async () => {};
@@ -198,7 +211,7 @@
                     composer.elements.text.dispatchEvent(new Event('input'));
                 }
             }
-            notify(data.status === 'SAVED' ? 'Catatan internal disimpan.' : 'Pesan masuk antrean. Status pengiriman diperbarui otomatis.');
+            notify(data.status === 'SAVED' ? 'Catatan internal disimpan.' : 'Pesan masuk antrean.', true);
             await refreshConversation();
         } catch {
             notify('Pengiriman belum dapat dipastikan. Draft tetap tersimpan. Periksa koneksi sebelum mencoba kembali.');

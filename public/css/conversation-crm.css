@@ -109,3 +109,20 @@ html[data-theme=dark] :is(.cc-tabs a:hover,.cc-tabs a.active){background:#243d60
 @media(min-width:768px){.cc-inbox{height:calc(100dvh - 280px);min-height:460px}.cc-profile{grid-template-columns:minmax(220px,.8fr) minmax(0,1.6fr) minmax(250px,1fr)}}
 
 .cc-receipt{display:inline-block;vertical-align:middle;min-width:16px;font-size:15px;font-weight:700;line-height:1;margin-left:3px;white-space:nowrap}.cc-receipt[data-status=DELIVERED],.cc-receipt[data-status=READ]{letter-spacing:-5px;padding-right:5px}.cc-receipt.is-read{color:#1685c5}html[data-theme=dark] .cc-receipt.is-read{color:#69c9ff}.cc-receipt.is-failed{color:#d54c44}
+
+/* Minimal message composer with secondary actions in the options menu. */
+.cc-thread>.cc-composer{overflow:visible;max-height:none;padding:10px 12px}
+[data-cc-composer]{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:8px;align-items:end}
+.cc-compose-menu{position:relative;grid-column:1;order:1;align-self:end}
+.cc-compose-menu>summary{display:flex;align-items:center;justify-content:center;list-style:none;padding:0;width:42px;height:48px;border:1px solid var(--jm-border,#dce5ef);border-radius:8px;color:var(--jm-text,#27405e)}
+.cc-compose-menu>summary::-webkit-details-marker{display:none}
+.cc-compose-menu>summary:focus-visible{outline:2px solid #80b3ff;outline-offset:2px}
+.cc-compose-menu-items{position:absolute;bottom:calc(100% + 8px);left:0;z-index:110;display:grid;min-width:190px;padding:6px;border:1px solid var(--jm-border,#dce5ef);border-radius:10px;background:var(--jm-surface,#fff);box-shadow:0 6px 24px #0003}
+.cc-compose-menu:not([open])>.cc-compose-menu-items{display:none}
+.cc-compose-menu-items button{text-align:left;background:transparent;color:var(--jm-text,#27405e);border:0;border-radius:6px;padding:8px 12px}
+.cc-compose-menu-items button[aria-pressed=true]{background:#1769ed18;color:var(--jm-text,#27405e)}
+.cc-composer [data-cc-text]{grid-column:2;order:2;margin:0;min-width:0}
+.cc-composer .cc-compose-footer{grid-column:3;order:3;margin:0;align-self:end}
+.cc-composer .cc-compose-footer button{min-height:48px;height:48px}
+.cc-composer .cc-compose-modes,.cc-composer [data-cc-template],.cc-composer [data-cc-attachment]{grid-column:1/-1;order:0;margin:0;max-height:180px;overflow:auto}
+.cc-composer .cc-compose-modes:not(:has([data-cc-quick-panel]:not([hidden]))){display:none}
