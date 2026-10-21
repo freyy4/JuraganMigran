@@ -1,7 +1,21 @@
 (() => {
     const root = document.querySelector('[data-master-workspace]');
     if (!root) return;
-    root.querySelector('[data-master-navigation]')?.addEventListener('change', event => { if (event.target.value) location.href = event.target.value; });
+    root.querySelectorAll('[data-master-more]').forEach(menu => {
+        const summary = menu.querySelector('summary');
+        menu.addEventListener('toggle', () => summary.setAttribute('aria-expanded', String(menu.open)));
+        document.addEventListener('click', event => { if (!menu.contains(event.target)) menu.open = false; });
+        menu.addEventListener('click', event => { if (event.target.closest('a')) menu.open = false; });
+        menu.addEventListener('keydown', event => {
+            if (event.key === 'Escape') { event.preventDefault(); menu.open = false; summary.focus(); }
+            if (!['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return;
+            event.preventDefault(); menu.open = true;
+            const links = [...menu.querySelectorAll('a')], index = links.indexOf(document.activeElement);
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? links.length - 1 : index < 0 ? (event.key === 'ArrowUp' ? links.length - 1 : 0) : (index + (event.key === 'ArrowDown' ? 1 : -1) + links.length) % links.length;
+            links[next]?.focus();
+        });
+    });
+
     root.addEventListener('invalid', event => {
         const pane = event.target.closest('[data-master-doc-pane]');
         if (!pane?.hidden) return;

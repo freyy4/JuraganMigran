@@ -45,6 +45,14 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
                     const issues=[],main=document.getElementById('main-content');if(!main)return ['missing main content'];
                     if(document.documentElement.dataset.theme!==${JSON.stringify(theme)})issues.push('theme not applied');
                     if(document.documentElement.scrollWidth>innerWidth+2)issues.push('outer overflow '+document.documentElement.scrollWidth+' > '+innerWidth);
+                    const masterMenu=document.querySelector('[data-master-more]');
+                    if(masterMenu){
+                        masterMenu.open=true;
+                        const popup=masterMenu.querySelector('.master-navigation-menu').getBoundingClientRect();
+                        if(popup.width===0||popup.left<0||popup.right>innerWidth)issues.push('master overflow menu must be visible within viewport');
+                        masterMenu.querySelector('summary').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+                        if(masterMenu.open)issues.push('master overflow menu must close with Escape');
+                    }
                     const rail=document.querySelector('.crm-topbar .jm-tabs--rail');
                     if(rail){
                         if(document.querySelector('.crm-topbar').getBoundingClientRect().height!==64)issues.push('top rail must be 64px');
