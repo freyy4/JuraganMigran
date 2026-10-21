@@ -7,7 +7,7 @@ import {spawn} from 'node:child_process';
 const chromePath = process.env.SITE_QA_CHROME;
 const fixtures = process.env.CRM_QA_FIXTURES;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-test(process.env.CRM_CHAT_ONLY === '1' ? 'CRM live chat preserves drafts and handles owner conflicts without resending' : 'CRM inbox supports compact responsive panes, visible composer, internal notes and help', {skip: !chromePath || !fixtures}, async () => {
+test(process.env.CRM_INSPECTOR_ONLY === '1' ? 'Visible CRM inspector controls remain clickable across desktop and mobile widths' : process.env.CRM_CHAT_ONLY === '1' ? 'CRM live chat preserves drafts and handles owner conflicts without resending' : 'CRM inbox supports compact responsive panes, visible composer, internal notes and help', {skip: !chromePath || !fixtures}, async () => {
     let origin;
     const server = http.createServer((request, response) => {
         const url = new URL(request.url, 'http://localhost');
@@ -58,6 +58,32 @@ test(process.env.CRM_CHAT_ONLY === '1' ? 'CRM live chat preserves drafts and han
         const navigate = async page => { await send('Page.navigate',{url:origin+'/'+page}); for (let i=0;i<80;i++) { await delay(50); if (await evaluate(`document.readyState==='complete' && !!document.querySelector('.crm-top-rail')`)) return; } throw Error('Navigation failed'); };
         await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
         await navigate('inbox');
+        if (process.env.CRM_INSPECTOR_ONLY === '1') {
+            const click = async selector => {
+                const point = await evaluate(`(()=>{const element=document.querySelector(${JSON.stringify(selector)});element.scrollIntoView({block:'center'});const rect=element.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
+                await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});
+                await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});
+            };
+            for (const width of [1366,1200,1440,1199,900,390]) {
+                await send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<768});
+                await navigate('inbox');
+                if (width < 1200) await click('.cc-thread-head [data-cc-inspector]');
+                assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`),'block');
+                assert.equal(await evaluate(`document.querySelector('.cc-inspector').inert`),false,`Visible inspector must be interactive at ${width}px`);
+                await click('.cc-inspector select[name=stage]');
+                assert.equal(await evaluate(`document.activeElement === document.querySelector('.cc-inspector select[name=stage]')`),true,`Stage selector must receive pointer clicks at ${width}px`);
+                await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+                await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+                // Reopen if Escape also dismissed the drawer after closing the native select.
+                if (await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display==='none'`)) await click('.cc-thread-head [data-cc-inspector]');
+                await click('.cc-inspector-close');
+                assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`),'none',`Close button must work at ${width}px`);
+                await click('.cc-thread-head [data-cc-inspector]');
+                assert.equal(await evaluate(`document.querySelector('.cc-inspector').inert`),false);
+                assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`),'block');
+            }
+            return;
+        }
         await evaluate(`
             window.__originalFetch = window.fetch;
             window.__live = {version:0,can_reply:true,owner_name:'CS Pertama',status:'OPEN',service_window_expires_at:'2099-01-01 00:00:00'};

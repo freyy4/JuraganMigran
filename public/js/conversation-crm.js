@@ -26,7 +26,7 @@
     const workspace = document.querySelector('.cc-inbox');
     const inspector = workspace?.querySelector('.cc-inspector');
     const inspectorKey = `jm-crm-${document.body.dataset.uiUser}-inspector-collapsed`;
-    const inspectorDesktop = matchMedia('(min-width:1440px)');
+    const inspectorDesktop = matchMedia('(min-width:1200px)');
     const syncInspector = () => {
         const open = inspectorDesktop.matches ? !workspace?.classList.contains('rail-collapsed') : inspector?.classList.contains('is-open');
         document.querySelectorAll('[data-cc-inspector]').forEach(button => button.setAttribute('aria-expanded', String(!!open)));
