@@ -141,6 +141,25 @@
         const preserve=()=>{try{sessionStorage.setItem(draftKey,JSON.stringify({text:composer.elements.text.value,clientKey:composer.elements.client_key.value,mode:composer.elements.mode.value}));}catch{}};
         composer.elements.text.addEventListener('input',preserve);composer.addEventListener('change',preserve);composer.addEventListener('submit',preserve);composer.elements.text.dispatchEvent(new Event('input'));
     }
+    const renderMessageCaption = (element, message) => {
+        const timestamp = message.provider_timestamp || message.created_at;
+        const time = new Date(timestamp.replace(' ', 'T') + (timestamp.includes('Z') ? '' : 'Z'))
+            .toLocaleString('id-ID', {timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'});
+        element.textContent = time;
+        if (message.direction === 'OUTBOUND') {
+            const [icon, label] = {
+                SENT: ['✓', 'Terkirim'], DELIVERED: ['✓✓', 'Diterima'], READ: ['✓✓', 'Dibaca'],
+                FAILED: ['!', 'Gagal dikirim'], SENDING: ['◷', 'Sedang dikirim']
+            }[message.status] || ['◷', 'Dalam antrean'];
+            const receipt = document.createElement('span');
+            receipt.className = 'cc-receipt'; receipt.dataset.status = message.status;
+            receipt.classList.toggle('is-read', message.status === 'READ');
+            receipt.classList.toggle('is-failed', message.status === 'FAILED');
+            receipt.setAttribute('role', 'img'); receipt.setAttribute('aria-label', label); receipt.title = label;
+            receipt.textContent = icon; element.append(' ', receipt);
+        } else if (message.direction === 'INTERNAL') element.append(' · Tersimpan');
+        if (message.error_code) element.append(' · ' + message.error_code);
+    };
     const messages = document.querySelector('.cc-messages'); if (messages && !new URLSearchParams(location.search).has('before')) messages.scrollTop = messages.scrollHeight;
     const inbox = document.querySelector('[data-cc-inbox]');
     const notice = document.querySelector('[data-cc-notice]');
@@ -225,12 +244,11 @@
                 for (const message of data.messages || []) {
                     clearDraft(message);
                     const old = messages.querySelector(`[data-message-id="${message.id}"]`);
-                    const caption = new Date((message.provider_timestamp || message.created_at).replace(' ', 'T') + ((message.provider_timestamp || message.created_at).includes('Z') ? '' : 'Z')).toLocaleString('id-ID', {timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}) + ' · ' + message.status + (message.error_code ? ' · ' + message.error_code : '');
-                    if (old) { old.querySelector('small').textContent = caption; continue; }
+                    if (old) { renderMessageCaption(old.querySelector('small'), message); continue; }
                     const item = document.createElement('article'); item.dataset.messageId = message.id; item.className = 'cc-message';
                     item.classList.toggle('outbound', message.direction === 'OUTBOUND'); item.classList.toggle('internal', message.direction === 'INTERNAL');
                     if (message.direction === 'INTERNAL') { const label = document.createElement('strong'); label.textContent = 'Catatan internal · tidak dikirim'; item.append(label); }
-                    const text = document.createElement('p'); text.textContent = message.text; const small = document.createElement('small'); small.textContent = caption; item.append(text, small); if (message.direction === 'INBOUND' && ['image','document'].includes(message.message_type)) {
+                    const text = document.createElement('p'); text.textContent = message.text; const small = document.createElement('small'); renderMessageCaption(small, message); item.append(text, small); if (message.direction === 'INBOUND' && ['image','document'].includes(message.message_type)) {
                         const link = document.createElement('a');
                         link.href = composer.action.replace(/\/send$/, `/messages/${Number(message.id)}/attachment`);
                         link.textContent = 'Unduh lampiran (pemeriksaan keamanan)'; item.append(link);

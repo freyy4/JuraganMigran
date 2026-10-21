@@ -90,7 +90,7 @@ test(process.env.CRM_INSPECTOR_ONLY === '1' ? 'Visible CRM inspector controls re
             window.__sendStatus = 409; window.__sendCount = 0;
             window.fetch = async (url, options = {}) => {
                 if (options.method === 'POST') { window.__sendCount++; return Response.json({message:'Owner berubah',status:'SAVED'}, {status:window.__sendStatus}); }
-                return Response.json({selected:window.__live,messages:[]});
+                return Response.json({selected:window.__live,messages:window.__messages || []});
             };
             document.dispatchEvent(new Event('visibilitychange'));
         `);
@@ -118,6 +118,12 @@ test(process.env.CRM_INSPECTOR_ONLY === '1' ? 'Visible CRM inspector controls re
         await delay(150);
         assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.text.value`),'');
         assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.client_key.value !== window.__oldKey`),true);
+        for (const [state, icon] of [['QUEUED','◷'],['SENT','✓'],['DELIVERED','✓✓'],['READ','✓✓']]) {
+            await evaluate(`window.__messages=[{id:999999,direction:'OUTBOUND',status:${JSON.stringify(state)},text:'Uji status',created_at:'2026-10-21 10:00:00'}];document.dispatchEvent(new Event('visibilitychange'));`);
+            await delay(100);
+            assert.equal(await evaluate(`document.querySelector('[data-message-id="999999"] .cc-receipt').textContent`),icon);
+            assert.equal(await evaluate(`document.querySelector('[data-message-id="999999"] .cc-receipt').classList.contains('is-read')`),state === 'READ');
+        }
         await evaluate(`
             const retryForm=document.querySelector('[data-cc-composer]');
             const mode=retryForm.querySelector('[data-cc-mode-select]');mode.value='note';mode.dispatchEvent(new Event('change'));
