@@ -3,8 +3,8 @@
 Aplikasi operasional perekrutan dan penempatan pekerja migran, dari perolehan calon kandidat sampai kesiapan proses dan keberangkatan.
 
 <!-- APP-VERSION:START -->
-**Versi pencatatan:** `v0.1.12`<br>
-**Terakhir diperbarui:** 2026-10-21 22:15:06 WIB
+**Versi pencatatan:** `v0.1.13`<br>
+**Terakhir diperbarui:** 2026-10-21 22:20:04 WIB
 <!-- APP-VERSION:END -->
 
 ## Fitur utama
@@ -58,6 +58,7 @@ Ringkasan otomatis dibentuk dari file dan jenis perubahan. Ringkasan menjelaskan
 <!-- AUTO-UPDATES:START -->
 | Tanggal (WIB) | Versi | Update |
 | --- | --- | --- |
+| 2026-10-21 22:20:04 WIB | v0.1.13 | Update pengujian WhatsApp dan percakapan (1 file; 1 diubah). <!-- snapshot:d48eec6c4a2831008a3baa6183dc408513aaf1db8ae34f62aebfa4abd11f799f --> |
 | 2026-10-21 22:15:06 WIB | v0.1.12 | Update WhatsApp dan percakapan (5 file; 5 diubah). <!-- snapshot:9ee371c0ad976a3688d68db9fa8fd091e6da86cf43e679a5f632ea46181f754d --> |
 | 2026-10-21 21:20:05 WIB | v0.1.11 | Update WhatsApp dan percakapan (3 file; 3 diubah). <!-- snapshot:8f5fc289fd5af7e425b7eec128f547193349d08dad69f2459e7ea93b3be7fc9e --> |
 | 2026-10-21 21:15:04 WIB | v0.1.10 | Update CRM dan tindak lanjut, WhatsApp dan percakapan (10 file; 10 diubah). <!-- snapshot:bba4671413d50631e4beb55e73cfac5f9994ce94db78809afdb7a40a938d83af --> |

@@ -7,14 +7,18 @@ import {spawn} from 'node:child_process';
 const chromePath = process.env.SITE_QA_CHROME;
 const fixtures = process.env.CRM_QA_FIXTURES;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-test('CRM inbox supports compact responsive panes, visible composer, internal notes and help', {skip: !chromePath || !fixtures}, async () => {
+test(process.env.CRM_CHAT_ONLY === '1' ? 'CRM live chat preserves drafts and handles owner conflicts without resending' : 'CRM inbox supports compact responsive panes, visible composer, internal notes and help', {skip: !chromePath || !fixtures}, async () => {
     let origin;
     const server = http.createServer((request, response) => {
         const url = new URL(request.url, 'http://localhost');
         if (['/inbox', '/pipeline', '/profile', '/settings'].includes(url.pathname)) {
             response.setHeader('Content-Type', 'text/html');
             const html = fs.readFileSync(path.join(fixtures, url.pathname.slice(1) + '.html'), 'utf8');
-            response.end(html.replaceAll(/https?:\/\/[^/"\s]+\/(css|js)\//g, `${origin}/$1/`)); return;
+            response.end(html.replace(/data-poll-url="[^"]*"/, `data-poll-url="${origin}/qa-live"`).replaceAll(/https?:\/\/[^/"\s]+\/(css|js)\//g, `${origin}/$1/`)); return;
+        }
+        if (url.pathname === '/qa-live') {
+            response.setHeader('Content-Type', 'application/json');
+            response.end(JSON.stringify({selected:{version:0,can_reply:true,status:'OPEN',service_window_expires_at:'2099-01-01 00:00:00'},messages:[]})); return;
         }
         const file = path.resolve('public', '.' + url.pathname);
         if ((file.startsWith(path.resolve('public/css') + '/') || file.startsWith(path.resolve('public/js') + '/')) && fs.existsSync(file)) {
@@ -74,7 +78,7 @@ test('CRM inbox supports compact responsive panes, visible composer, internal no
         `);
         await delay(150);
         assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.text.value`),'Draft jangan hilang');
-        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.version.value`),'1');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.version.value`),'1', JSON.stringify(await evaluate(`({count:window.__sendCount,notice:document.querySelector('[data-cc-notice]').textContent,live:document.querySelector('[data-cc-live-status]').textContent,valid:document.querySelector('[data-cc-composer]').checkValidity(),disabled:document.querySelector('.cc-compose-footer button').disabled})`)));
         assert.equal(await evaluate(`document.querySelector('[data-cc-owner]').textContent`),'CS Baru');
         assert.equal(await evaluate(`JSON.parse(sessionStorage.getItem(window.__draftKey)).text`),'Draft jangan hilang');
         assert.equal(await evaluate(`window.__sendCount`),1,'Conflict must not automatically resend');
@@ -88,7 +92,21 @@ test('CRM inbox supports compact responsive panes, visible composer, internal no
         await delay(150);
         assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.text.value`),'');
         assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.client_key.value !== window.__oldKey`),true);
-        await evaluate(`window.fetch=window.__originalFetch`);
+        await evaluate(`
+            const retryForm=document.querySelector('[data-cc-composer]');
+            const mode=retryForm.querySelector('[data-cc-mode-select]');mode.value='note';mode.dispatchEvent(new Event('change'));
+            retryForm.elements.text.value='Catatan tersimpan saat koneksi putus';retryForm.elements.text.dispatchEvent(new Event('input'));
+            window.__retryKey=retryForm.elements.client_key.value;
+            window.fetch=async()=>{throw new Error('offline')};retryForm.requestSubmit();
+        `);
+        await delay(100);
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.client_key.value`),await evaluate(`window.__retryKey`));
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.text.value`),'Catatan tersimpan saat koneksi putus');
+        await navigate('inbox');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.text.value`),'Catatan tersimpan saat koneksi putus');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-composer]').elements.mode.value`),'note');
+        if (process.env.CRM_CHAT_ONLY === '1') return;
+
         assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`), 'block');
         assert.equal(await evaluate(`document.querySelector('.crm-topbar').getBoundingClientRect().height`), 64);
         await send('Emulation.setDeviceMetricsOverride',{width:1366,height:768,deviceScaleFactor:1,mobile:false});
