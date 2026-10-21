@@ -8,7 +8,7 @@ class CrmQuickReply
 {
     public const VARIABLES = ['nama', 'program', 'negara', 'nama_cs'];
 
-    public static function render(string $body, object $lead, string $agent): string
+    public static function context(object $lead, string $agent): array
     {
         $interest = DB::table('crm_lead_interests as interest')
             ->join('vacancies as vacancy', 'vacancy.id', '=', 'interest.vacancy_id')
@@ -17,12 +17,16 @@ class CrmQuickReply
             ->where('interest.lead_id', $lead->id)->orderByDesc('interest.id')
             ->first(['vacancy.title as program', 'country.name as country']);
 
-        return preg_replace_callback('/\{\{\s*(\w+)\s*\}\}/u', fn (array $match): string => match ($match[1]) {
+        return [
             'nama' => $lead->name,
             'program' => $interest?->program ?? 'program yang diminati',
             'negara' => $interest?->country ?? 'negara tujuan',
             'nama_cs' => $agent,
-            default => $match[0],
-        }, $body);
+        ];
+    }
+
+    public static function render(string $body, array $context): string
+    {
+        return preg_replace_callback('/\{\{\s*(\w+)\s*\}\}/u', fn (array $match): string => $context[$match[1]] ?? $match[0], $body);
     }
 }
