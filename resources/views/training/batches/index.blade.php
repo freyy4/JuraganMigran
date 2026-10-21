@@ -1,7 +1,7 @@
 @extends('layouts.candidates')
 @section('title','Angkatan Pelatihan')
 @section('content')
-<div class="heading"><div><h1>Angkatan Pelatihan</h1></div><a class="button" href="{{ route('training-batches.create') }}">+ Tambah Angkatan</a></div>@include('training.tabs')
+<div class="heading"><div><h1>Angkatan Pelatihan</h1></div><a class="button" href="{{ route('training-batches.create') }}">+ Tambah Angkatan</a></div>
 <form method="get" action="{{ route('training-batches.index') }}" class="card filters"><div class="search"><label for="search">Cari kode / nama angkatan</label><input id="search" name="search" maxlength="255" value="{{ request('search') }}"></div><div><label for="company_id">LPK</label><select id="company_id" name="company_id"><option value="">Semua LPK</option>@foreach($companies as $company)<option value="{{ $company->id }}" @selected((string)request('company_id')===(string)$company->id)>{{ $company->name }}</option>@endforeach</select></div><div><label for="status">Status</label><select id="status" name="status"><option value="">Semua status</option>@foreach(\App\Models\TrainingBatch::STATUSES as $value=>$label)<option value="{{ $value }}" @selected(request('status')===$value)>{{ $label }}</option>@endforeach</select></div>
 <div class="filter-actions"><button>Terapkan</button><a class="button secondary" href="{{ route('training-batches.index') }}">Reset</a></div>
 </form>
