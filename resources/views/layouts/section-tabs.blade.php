@@ -1,5 +1,5 @@
 @php
-    $tabGroups = collect(config('navigation'))->map(function ($group) {
+    $tabGroups = collect(config('navigation'))->filter(fn ($group) => collect($group['items'])->contains(fn ($item) => request()->routeIs($item['active'])))->map(function ($group) {
         $group['items'] = collect($group['items'])->filter(function ($item) {
             $routePermission = app(\App\Services\AccessPolicy::class)->routePermission($item['route']);
             $permission = $item['permission'] ?? $routePermission;

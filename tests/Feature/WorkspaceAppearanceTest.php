@@ -44,7 +44,7 @@ class WorkspaceAppearanceTest extends TestCase
         foreach ($pages as $key => $url) {
             $response = $this->followingRedirects()->get($url);
             $this->assertSame(200, $response->status(), $key.' must render');
-            $response->assertSee('workspace-appearance.css')->assertSee('data-theme-toggle', false);
+            $response->assertSee('workspace-appearance.css')->assertSee('workspace-tabs.css')->assertSee('data-theme-toggle', false)->assertDontSee("@include('layouts.section-tabs')", false);
             if ($key === 'form-candidate-edit') {
                 $response->assertSee($application->candidate->candidate_code)->assertSee('name="person[full_name]"', false);
             }

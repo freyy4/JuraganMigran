@@ -45,6 +45,20 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
                     const issues=[],main=document.getElementById('main-content');if(!main)return ['missing main content'];
                     if(document.documentElement.dataset.theme!==${JSON.stringify(theme)})issues.push('theme not applied');
                     if(document.documentElement.scrollWidth>innerWidth+2)issues.push('outer overflow '+document.documentElement.scrollWidth+' > '+innerWidth);
+                    const rail=document.querySelector('.crm-topbar .jm-tabs--rail');
+                    if(rail){
+                        if(document.querySelector('.crm-topbar').getBoundingClientRect().height!==64)issues.push('top rail must be 64px');
+                        if(rail.classList.contains('task-tabs')&&rail.querySelectorAll('[aria-current=page]').length!==1)issues.push('section must have one active tab');
+                        if(main.querySelector('.jm-tabs--rail'))issues.push('section tabs duplicated in content');
+                    }
+                    for(const tabs of document.querySelectorAll('.jm-tabs')){
+                        for(const control of tabs.querySelectorAll(':scope>a,:scope>button')){
+                            const rect=control.getBoundingClientRect();
+                            if(rect.height&&getComputedStyle(control).borderRadius!=='0px')issues.push('tab must use shared underline shape');
+                            if(rect.height&&getComputedStyle(control).whiteSpace!=='nowrap')issues.push('tab label must stay on one line');
+                        }
+                    }
+
                     const visible=node=>{const box=node.getBoundingClientRect(),style=getComputedStyle(node);return box.width>0&&box.height>0&&style.visibility!=='hidden';};
                     const rgb=color=>(color.match(/[\\d.]+/g)||[]).map(Number);
                     const luminance=color=>{const channels=rgb(color).slice(0,3).map(channel=>{const v=channel/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;};
