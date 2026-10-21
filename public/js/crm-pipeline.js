@@ -1,6 +1,23 @@
 (() => {
     const root = document.querySelector('[data-cp-user]');
     if (!root) return;
+    const preferenceKey = `jm-crm-${root.dataset.cpUser}-pipeline-view`;
+    const currentFilters = JSON.parse(root.dataset.cpFilters);
+    const pageUrl = new URL(location.href);
+    try {
+        const saved = JSON.parse(localStorage.getItem(preferenceKey) || 'null');
+        let restore = false;
+        if (!pageUrl.searchParams.has('view') && saved) {
+            for (const [key, values] of Object.entries({mode:['kanban','list'],sort:['followup','created','name','activity']})) {
+                if (!pageUrl.searchParams.has(key) && values.includes(saved[key]) && saved[key] !== (currentFilters[key] || (key === 'mode' ? 'kanban' : 'followup'))) {
+                    pageUrl.searchParams.set(key, saved[key]); restore = true;
+                }
+            }
+        }
+        if (restore) { location.replace(pageUrl.href); return; }
+        localStorage.setItem(preferenceKey, JSON.stringify({mode:currentFilters.mode || 'kanban',sort:currentFilters.sort || 'followup'}));
+    } catch {}
+
     const request = async (url, method = 'GET', body) => {
         const response = await fetch(url, {method, headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':root.dataset.cpToken}, ...(body ? {body:JSON.stringify(body)} : {})});
         const data = await response.json();
@@ -45,7 +62,12 @@
             } else version = data.version;
         } catch (error) { layoutFeedback.textContent = error.message; }
     };
-    fields.forEach(input => input.addEventListener('change', apply));
+    fields.forEach(input => input.addEventListener('change', () => {
+        if (fields.filter(field => field.checked).length > 8) {
+            input.checked = false; layoutFeedback.textContent = 'Pilih maksimal 8 informasi. Nama lead selalu tampil.';
+        } else layoutFeedback.textContent = '';
+        apply();
+    }));
     scope.addEventListener('change', () => loadLayout());
     document.querySelector('[data-cp-save-layout]').addEventListener('click', async event => {
         event.target.disabled = true;
@@ -55,7 +77,7 @@
         } catch (error) { layoutFeedback.textContent = error.message; }
         finally { event.target.disabled = false; }
     });
-    loadLayout(true);
+    apply(); loadLayout(true);
     document.querySelectorAll('.cp-menu button,.cp-menu a').forEach(button => button.addEventListener('click', () => button.closest('details').open = false));
     document.querySelectorAll('.cp-menu').forEach(menu => {
         document.addEventListener('click', event => { if (!menu.contains(event.target)) menu.open = false; });
@@ -75,9 +97,17 @@
     }));
     let draggedStage;
     document.querySelectorAll('[data-cp-stage-id]').forEach(row => {
+        const reorder = direction => {
+            const other = direction === 'up' ? row.previousElementSibling : row.nextElementSibling;
+            if (!other?.matches('[data-cp-stage-id]')) return;
+            if (direction === 'up') other.before(row); else other.after(row);
+            document.querySelectorAll('[data-cp-stage-id]').forEach((item,index) => { item.querySelector('[name=display_order]').value = index; const order = item.querySelector('[data-cp-stage-order]'); if (order) order.textContent = index + 1; });
+        };
+        row.querySelector('[data-cp-stage-up]')?.addEventListener('click', () => reorder('up'));
+        row.querySelector('[data-cp-stage-down]')?.addEventListener('click', () => reorder('down'));
         row.addEventListener('dragstart', event => { if (event.target.closest('input,select,button')) { event.preventDefault(); return; } draggedStage = row; });
         row.addEventListener('dragover', event => event.preventDefault());
-        row.addEventListener('drop', event => { event.preventDefault(); if (draggedStage && draggedStage !== row) row.before(draggedStage); draggedStage = null; document.querySelectorAll('[data-cp-stage-id]').forEach((item,index) => item.querySelector('[name=display_order]').value = index); });
+        row.addEventListener('drop', event => { event.preventDefault(); if (draggedStage && draggedStage !== row) row.before(draggedStage); draggedStage = null; document.querySelectorAll('[data-cp-stage-id]').forEach((item,index) => { item.querySelector('[name=display_order]').value = index; const order = item.querySelector('[data-cp-stage-order]'); if (order) order.textContent = index + 1; }); });
     });
     document.querySelector('[data-cp-save-stage-order]')?.addEventListener('click', async event => {
         const feedback = document.querySelector('[data-cp-stage-feedback]');
@@ -109,7 +139,7 @@
         const summary = document.querySelector('[data-cp-export-summary]');
         if (summary) summary.textContent = `Pilihan saat ini: ${allFiltered ? 'semua hasil filter' : boxes.filter(box => box.checked).length + ' lead'}. Filter tahap dan akses Anda tetap diterapkan pada server.`;
     };
-    document.querySelector('[data-cp-select-start]')?.addEventListener('click', () => { root.classList.add('is-selecting'); boxes[0]?.focus(); });
+    document.querySelector('[data-cp-select-start]')?.addEventListener('click', () => { root.classList.toggle('is-selecting'); if (root.classList.contains('is-selecting')) boxes[0]?.focus(); });
     document.querySelector('[data-cp-export]')?.addEventListener('click', () => { action.value = 'export'; form.elements.export_scope.value = 'filtered'; updateAction(); document.getElementById('cp-bulk-action').showModal(); });
     let previewSequence = 0;
     const previewExport = async () => {

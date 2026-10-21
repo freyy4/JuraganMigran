@@ -8,7 +8,11 @@
     const syncInspector = () => {
         const open = inspectorDesktop.matches ? !workspace?.classList.contains('rail-collapsed') : inspector?.classList.contains('is-open');
         document.querySelectorAll('[data-cc-inspector]').forEach(button => button.setAttribute('aria-expanded', String(!!open)));
-        if (inspector) inspector.inert = !open;
+        if (inspector) {
+            inspector.inert = !open;
+            if (open && !inspectorDesktop.matches) { inspector.setAttribute('role', 'dialog'); inspector.setAttribute('aria-modal', 'true'); }
+            else { inspector.removeAttribute('role'); inspector.removeAttribute('aria-modal'); }
+        }
     };
     try { if (localStorage.getItem(inspectorKey) === 'true') workspace?.classList.add('rail-collapsed'); } catch {}
     syncInspector(); inspectorDesktop.addEventListener('change', syncInspector);
@@ -22,6 +26,12 @@
         else if (!inspector?.inert) inspector?.querySelector('button,a,summary')?.focus();
     }));
     document.addEventListener('keydown', event => {
+        if (event.key === 'Tab' && !inspectorDesktop.matches && inspector?.classList.contains('is-open')) {
+            const controls = [...inspector.querySelectorAll('a[href],button,input,select,textarea,summary')].filter(control => !control.disabled && control.getClientRects().length);
+            const first = controls[0], last = controls.at(-1);
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        }
         if (event.key === 'Escape' && inspector?.classList.contains('is-open')) {
             inspector.classList.remove('is-open'); syncInspector(); workspace.querySelector('.cc-thread-head [data-cc-inspector]')?.focus();
         }
@@ -170,6 +180,8 @@
                 const result = await response.json();
                 if (!response.ok) throw new Error(response.status === 409 ? 'Lead telah diubah pengguna lain. Muat ulang sebelum mencoba lagi.' : Object.values(result.errors || {}).flat()[0] || result.message || 'Tahap gagal diperbarui.');
                 moving.dataset.version = result.version;
+                const activity = moving.querySelector('[data-cp-show=activity]');
+                if (activity) activity.textContent = 'Diperbarui baru saja';
                 feedback.textContent = 'Tahap berhasil diperbarui.';
                 const targets = JSON.parse(board.dataset.transitions || '{}')[result.stage] || [];
                 const fallback = moving.querySelector('[data-cp-move]');

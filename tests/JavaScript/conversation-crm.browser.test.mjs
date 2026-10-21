@@ -7,7 +7,7 @@ import {spawn} from 'node:child_process';
 const chromePath = process.env.SITE_QA_CHROME;
 const fixtures = process.env.CRM_QA_FIXTURES;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-test('CRM inbox supports responsive panes, internal notes, help and remembered onboarding', {skip: !chromePath || !fixtures}, async () => {
+test('CRM inbox supports compact responsive panes, visible composer, internal notes and help', {skip: !chromePath || !fixtures}, async () => {
     let origin;
     const server = http.createServer((request, response) => {
         const url = new URL(request.url, 'http://localhost');
@@ -55,6 +55,13 @@ test('CRM inbox supports responsive panes, internal notes, help and remembered o
         await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
         await navigate('inbox');
         assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cc-inspector')).display`), 'block');
+        assert.equal(await evaluate(`document.querySelector('.crm-topbar').getBoundingClientRect().height`), 64);
+        await send('Emulation.setDeviceMetricsOverride',{width:1366,height:768,deviceScaleFactor:1,mobile:false});
+        const sizes = await evaluate(`['.cc-list','.cc-thread','.cc-inspector'].map(s=>document.querySelector(s).getBoundingClientRect().width)`);
+        assert.ok(sizes[1] > sizes[0] && sizes[1] > sizes[2], 'Chat must be the largest pane at 1366px');
+        assert.ok(await evaluate(`document.querySelector('.cc-composer').getBoundingClientRect().height > 120`));
+        await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+
         assert.equal(await evaluate(`document.querySelector('[data-cc-attachment]').hidden`), true);
         await evaluate(`document.querySelector('[data-cc-mode="attachment"]').click()`);
         assert.equal(await evaluate(`document.querySelector('[data-cc-attachment]').hidden`), false);

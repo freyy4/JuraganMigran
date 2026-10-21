@@ -132,7 +132,7 @@ class CrmPipelineWorkspaceController extends Controller
     public function layout(Request $request): JsonResponse
     {
         if ($request->isMethod('put')) {
-            $data = $request->validate(['scope' => 'required|in:USER,TEAM,SYSTEM', 'version' => 'required|integer|min:0', 'fields' => 'present|array|max:8', 'fields.*' => 'required|distinct|in:avatar,source,owner,tags,followup,activity,message,interest']);
+            $data = $request->validate(['scope' => 'required|in:USER,TEAM,SYSTEM', 'version' => 'required|integer|min:0', 'fields' => 'present|array|max:8', 'fields.*' => 'required|distinct|in:avatar,source,owner,tags,followup,activity,message,interest,phone']);
             abort_unless($data['scope'] === 'USER' || $request->user()->hasPermission('crm.pipeline.manage'), 403);
             $scopeId = match ($data['scope']) {
                 'USER' => $request->user()->id, 'TEAM' => $request->user()->team_id, default => 0

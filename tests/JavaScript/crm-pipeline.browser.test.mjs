@@ -59,12 +59,21 @@ test('Pipeline workspace supports filters, layout, selection and failed stage ro
                 const path=new URL(url,location.href).pathname;
                 window.__calls.push({path,method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
                 if(path.includes('card-layout'))return new Response(JSON.stringify({scope:'USER',version:options.method==='PUT'?1:0,fields:['avatar','source','owner','tags','followup','activity']}),{status:200,headers:{'Content-Type':'application/json'}});
+                if(path.endsWith('/move') && window.__moveSuccess)return new Response(JSON.stringify({stage:JSON.parse(options.body).stage,version:JSON.parse(options.body).version+1}),{status:200,headers:{'Content-Type':'application/json'}});
                 if(path.endsWith('/move'))return new Response(JSON.stringify({message:'Conflict'}),{status:409,headers:{'Content-Type':'application/json'}});
                 return new Response('{}',{status:200,headers:{'Content-Type':'application/json'}});
             };
         `});
         await navigate('pipeline');
+        for (const width of [1440, 1366, 1200]) {
+            await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+            const controls = await evaluate(`Array.from(document.querySelectorAll('.cp-toolbar input:not([type=hidden]),.cp-toolbar select,.cp-toolbar>button,.cp-toolbar .cp-search button,.cp-toolbar .cp-view,.cp-toolbar summary')).map(e=>({height:e.getBoundingClientRect().height,top:e.getBoundingClientRect().top}))`);
+            assert.ok(controls.every(control => control.height === 40), 'Toolbar controls must be 40px at ' + width);
+            assert.ok(controls.every(control => Math.abs(control.top - controls[0].top) < 1), 'Toolbar controls must align at ' + width);
+        }
         assert.equal(await evaluate(`!!document.querySelector('[data-cp-select]')`),true);
+        await evaluate(`document.querySelector('[data-cp-select-start]').click()`);
+        assert.equal(await evaluate(`document.querySelector('.cp-bulk').hidden`),true, 'Entering selection mode must not select leads');
         assert.equal(await evaluate(`document.querySelector('.cp-bulk').hidden`),true);
         await evaluate(`document.querySelector('[data-cc-open="cp-filter"]').click()`);
         assert.equal(await evaluate(`document.querySelector('#cp-filter').open`),true);
@@ -89,6 +98,11 @@ test('Pipeline workspace supports filters, layout, selection and failed stage ro
         await delay(200);
         assert.equal(await evaluate(`document.querySelector('[data-id]').closest('[data-stage]').dataset.stage`),'NEW');
         assert.ok((await evaluate(`document.querySelector('[data-cc-feedback]').textContent`)).includes('pengguna lain'));
+        await evaluate(`window.__moveSuccess=true;window.__originalBoard=document.querySelector('[data-cc-board]');const successSelect=document.querySelector('[data-cp-move]');successSelect.value='CONTACTED';successSelect.dispatchEvent(new Event('change',{bubbles:true}));`);
+        await delay(200);
+        assert.equal(await evaluate(`document.querySelector('[data-id]').closest('[data-stage]').dataset.stage`),'CONTACTED');
+        assert.equal(await evaluate(`document.querySelector('[data-id]').dataset.version`),'1');
+        assert.equal(await evaluate(`document.querySelector('[data-cc-board]')===window.__originalBoard`),true,'Successful moves must preserve the board');
         await evaluate(`document.querySelector('[data-theme-toggle]').click()`);
         await checkDark(['.cp-summary a','.cc-column','.cc-lead-card']);
         await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});

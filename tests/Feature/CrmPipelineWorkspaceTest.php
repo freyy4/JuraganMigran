@@ -41,6 +41,12 @@ class CrmPipelineWorkspaceTest extends TestCase
         $this->getJson(route('crm.pipeline', ['source' => 'Referral', 'mode' => 'list']))->assertJsonPath('rows.total', 31)->assertJsonPath('summary.total', 31);
         $this->get(route('crm.pipeline', ['mode' => 'list']))->assertOk()->assertSee('cp-table', false);
         $this->get(route('crm.pipeline'))->assertOk()->assertSee('Pindah tahap')->assertSee('Filter lanjutan');
+        for ($i = 0; $i < 1000; $i++) {
+            $this->lead($user, ['crm_source' => 'Referral']);
+        }
+        $this->getJson(route('crm.pipeline', ['source' => 'Referral']))->assertOk()->assertJsonPath('summary.total', 1031)->assertJsonCount(25, 'stages.NEW.items');
+        $this->getJson(route('crm.pipeline', ['source' => 'Referral', 'mode' => 'list']))->assertOk()->assertJsonPath('rows.total', 1031)->assertJsonCount(50, 'rows.data');
+
     }
 
     public function test_search_sort_presets_and_archive_boundary(): void
@@ -99,6 +105,8 @@ class CrmPipelineWorkspaceTest extends TestCase
         $this->actingAs($user)->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 0, 'fields' => ['owner', 'followup']])->assertOk()->assertJsonPath('version', 1)->assertJsonPath('fields', ['owner', 'followup']);
         $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 0, 'fields' => []])->assertConflict();
         $this->putJson(route('crm.card-layout'), ['scope' => 'TEAM', 'version' => 0, 'fields' => []])->assertForbidden();
+        $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 1, 'fields' => ['phone', 'owner']])->assertOk()->assertJsonPath('fields', ['phone', 'owner']);
+        $this->putJson(route('crm.card-layout'), ['scope' => 'USER', 'version' => 2, 'fields' => ['avatar', 'source', 'owner', 'tags', 'followup', 'activity', 'message', 'interest', 'phone']])->assertUnprocessable();
         $this->actingAs($other)->getJson(route('crm.card-layout'))->assertOk()->assertJsonPath('version', 0);
     }
 
