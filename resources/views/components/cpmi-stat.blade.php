@@ -1,0 +1,1 @@
+@props(['label','value','icon'=>'chart'])<article class="cpmi-stat"><span class="cpmi-stat-icon"><x-ui-icon :name="$icon"/></span><div><small>{{ $label }}</small><strong>{{ number_format($value) }}</strong></div></article>

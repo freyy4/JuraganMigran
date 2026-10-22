@@ -1,0 +1,1 @@
+@props(['value'=>0,'label'=>'Kelengkapan'])<progress value="{{ $value }}" max="100" aria-label="{{ $label }} {{ $value }} persen"></progress>

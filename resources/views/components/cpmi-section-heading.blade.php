@@ -1,0 +1,1 @@
+@props(['icon'=>'file'])<h2><x-ui-icon :name="$icon"/> {{ $slot }}</h2>

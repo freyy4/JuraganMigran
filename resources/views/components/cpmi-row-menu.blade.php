@@ -1,0 +1,1 @@
+@props(['label'])<details class="cpmi-menu"><summary aria-label="{{ $label }}">⋮</summary><nav aria-label="Aksi calon pekerja">{{ $slot }}</nav></details>

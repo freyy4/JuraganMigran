@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\AcquisitionController;
 use App\Models\Application;
 use App\Models\Candidate;
 use App\Models\Country;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CandidateWorkspace
@@ -33,9 +33,10 @@ class CandidateWorkspace
         $applications = Application::where('candidate_id', $candidate->id)->with(['vacancy.jobOrder.country', 'currentStage', 'assignedCs'])->orderByDesc('applied_at')->orderByDesc('id')->get();
         $current = $applications->first(fn (Application $application): bool => ! in_array($application->status, ['closed', 'cancelled', 'rejected', 'withdrawn', 'completed'], true)) ?? $applications->first();
         $policy = app(AccessPolicy::class);
-        $leadRows = $permissions['timeline'] ? app(\App\Http\Controllers\AcquisitionController::class)->scopedLeads($request, 'candidate.read.timeline')->where('candidate_id', $candidate->id)->get(['id', 'name', 'crm_source', 'crm_stage', 'next_followup_at', 'assigned_cs_id']) : collect();
+        $leadRows = $permissions['timeline'] ? app(AcquisitionController::class)->scopedLeads($request, 'candidate.read.timeline')->where('candidate_id', $candidate->id)->get(['id', 'name', 'crm_source', 'crm_stage', 'next_followup_at', 'assigned_cs_id']) : collect();
         $leadIds = $leadRows->pluck('id');
         $timeline = collect();
+        $historyIds = collect();
         $activityCounts = ['messages' => 0, 'stages' => 0, 'followups' => 0, 'forms' => 0];
         $since = now()->subDays(30);
         $activityLabels = [
@@ -73,7 +74,7 @@ class CandidateWorkspace
         $healthSummary = $permissions['health'] ? Application::whereIn('id', $applications->modelKeys())->whereIn('id', $policy->applicationIds($request->user(), 'health.prescreen.read'))->with('latestHealthInterview')->get() : collect();
         $documentSummary = $permissions['documents'] ? Application::whereIn('id', $applications->modelKeys())->whereIn('id', $policy->applicationIds($request->user(), 'document.read.metadata'))->get()->map(fn (Application $application): array => ['application' => $application, 'summary' => app(DocumentRequirementEngine::class)->summary($application)]) : collect();
         $preferences = $candidate->preferences ?? [];
-        $targetCountry = !empty($preferences['target_country_id']) ? Country::find($preferences['target_country_id'])?->name : $current?->vacancy?->jobOrder?->country?->name;
+        $targetCountry = ! empty($preferences['target_country_id']) ? Country::find($preferences['target_country_id'])?->name : $current?->vacancy?->jobOrder?->country?->name;
         $portalAccount = DB::table('portal_accounts')->where('candidate_id', $candidate->id)->first(['status', 'activated_at']);
         $mobilityTimeline = $permissions['timeline'] ? DB::table('mobility_cases')->whereIn('application_id', $historyIds)->latest('id')->limit(10)->get(['id', 'code', 'purpose', 'status', 'created_at']) : collect();
 

@@ -183,7 +183,7 @@ class CrmWorkspaceTest extends TestCase
         DB::table('acquisition_leads')->insert(['public_token' => (string) Str::uuid(), 'name' => 'Lead Baru QA', 'normalized_phone' => '+628123450003', 'status' => 'new', 'followup_status' => 'NOT_CONTACTED', 'assigned_cs_id' => $user->id, 'created_at' => now(), 'updated_at' => now()]);
         $routes = ['leads' => 'acquisition.leads', 'requests' => 'portal-admin.requests', 'candidates' => 'candidates.index', 'applications' => 'applications.index', 'tasks' => 'tasks.index', 'follow-ups' => 'follow-ups.index', 'blockers' => 'blockers.index'];
         foreach ($routes as $name => $route) {
-            $response = $this->get(route($route))->assertOk()->assertSee('data-filter-toolbar', false)->assertSee('crm-workspace.css');
+            $response = $this->get(route($route))->assertOk()->assertSee('data-filter-toolbar', false)->assertSee($name === 'candidates' ? 'cpmi-workspace.css' : 'crm-workspace.css');
             if (getenv('CRM_QA_FIXTURES')) {
                 $html = preg_replace('~https?://[^/]+/(css|js)/~', 'file:///var/www/juraganmigran/public/$1/', $response->getContent());
                 file_put_contents('/tmp/jm-v810-'.$name.'.html', $html);

@@ -3,17 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\SaveCandidateRequest;
-use App\Models\Application;
 use App\Models\Candidate;
+use App\Models\Country;
 use App\Models\Person;
 use App\Services\AccessPolicy;
-use App\Services\CrmWorkspace;
 use App\Services\CandidateWorkspace;
-use Illuminate\Support\Carbon;
-use App\Services\DocumentRequirementEngine;
+use App\Services\CrmWorkspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -32,9 +31,11 @@ class CandidateController extends Controller
         $workspace = app(CrmWorkspace::class);
         $filters = $workspace->filters($request, ['status' => 'nullable|string|max:255', 'completeness' => 'nullable|in:complete,incomplete', 'vacancy_id' => 'nullable|integer|exists:vacancies,id', 'age' => 'nullable|in:18-25,26-35,36-45,46+', 'education' => 'nullable|string|max:255', 'gender' => 'nullable|in:male,female']);
         $score = $workspace->completenessSql();
+        $allIdentity = collect(app(AccessPolicy::class)->policies($request->user(), 'candidate.read.identity'))->contains(fn ($policy) => $policy['scope'] === 'OPERATIONAL_ALL');
+        $allContact = collect(app(AccessPolicy::class)->policies($request->user(), 'candidate.read.contact'))->contains(fn ($policy) => $policy['scope'] === 'OPERATIONAL_ALL');
         $query = Candidate::with('person')->join('persons', 'persons.id', '=', 'candidates.person_id')->whereNull('persons.deleted_at')->select('candidates.*')->selectRaw($score.' as profile_fields');
         if ($search = trim($filters['search'] ?? '')) {
-            $query->where(fn ($q) => $q->where('candidate_code', 'like', '%'.$search.'%')->orWhere('persons.full_name', 'like', '%'.$search.'%')->when($request->user()->hasPermission('candidate.read.identity'), fn ($q) => $q->orWhere(fn ($identity) => $identity->whereIn('candidates.id', app(AccessPolicy::class)->candidateIds($request->user(), 'candidate.read.identity'))->where('persons.nik', 'like', '%'.$search.'%')))->when($request->user()->hasPermission('candidate.read.contact'), fn ($q) => $q->orWhere(fn ($contact) => $contact->whereIn('candidates.id', app(AccessPolicy::class)->candidateIds($request->user(), 'candidate.read.contact'))->where('persons.whatsapp', 'like', '%'.$search.'%'))));
+            $query->where(fn ($q) => $q->where('candidate_code', 'like', '%'.$search.'%')->orWhere('persons.full_name', 'like', '%'.$search.'%')->when($request->user()->hasPermission('candidate.read.identity'), fn ($q) => $q->orWhere(fn ($identity) => $identity->when(! $allIdentity, fn ($scoped) => $scoped->whereIn('candidates.id', app(AccessPolicy::class)->candidateIds($request->user(), 'candidate.read.identity')))->where('persons.nik', 'like', '%'.$search.'%')))->when($request->user()->hasPermission('candidate.read.contact'), fn ($q) => $q->orWhere(fn ($contact) => $contact->when(! $allContact, fn ($scoped) => $scoped->whereIn('candidates.id', app(AccessPolicy::class)->candidateIds($request->user(), 'candidate.read.contact')))->where('persons.whatsapp', 'like', '%'.$search.'%'))));
         }
         if ($filters['status'] ?? '') {
             $query->where('candidates.status', $filters['status']);
@@ -45,7 +46,7 @@ class CandidateController extends Controller
         if ($filters['education'] ?? '') {
             $query->where('persons.education_level', $filters['education']);
         }
-        if (($filters['age'] ?? '') || ($filters['gender'] ?? '')) {
+        if (! $allIdentity && (($filters['age'] ?? '') || ($filters['gender'] ?? ''))) {
             $query->whereIn('candidates.id', app(AccessPolicy::class)->candidateIds($request->user(), 'candidate.read.identity'));
         }
         if ($filters['gender'] ?? '') {
@@ -80,7 +81,7 @@ class CandidateController extends Controller
 
     public function create(): View
     {
-        return view('candidates.form', ['candidate' => new Candidate(['status' => 'lead', 'registered_at' => now()]), 'statuses' => Candidate::statusOptions(), 'countries' => \App\Models\Country::orderBy('name')->get(['id', 'name'])]);
+        return view('candidates.form', ['candidate' => new Candidate(['status' => 'lead', 'registered_at' => now()]), 'statuses' => Candidate::statusOptions(), 'countries' => Country::orderBy('name')->get(['id', 'name'])]);
     }
 
     public function store(SaveCandidateRequest $request): RedirectResponse
@@ -120,7 +121,7 @@ class CandidateController extends Controller
 
     public function edit(Candidate $candidate): View
     {
-        return view('candidates.form', ['candidate' => $candidate->load(['person', 'contacts']), 'statuses' => Candidate::statusOptions(), 'countries' => \App\Models\Country::orderBy('name')->get(['id', 'name'])]);
+        return view('candidates.form', ['candidate' => $candidate->load(['person', 'contacts']), 'statuses' => Candidate::statusOptions(), 'countries' => Country::orderBy('name')->get(['id', 'name'])]);
     }
 
     public function update(SaveCandidateRequest $request, Candidate $candidate): RedirectResponse
