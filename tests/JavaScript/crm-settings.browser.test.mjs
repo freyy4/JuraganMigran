@@ -8,7 +8,7 @@ const chromePath = process.env.SITE_QA_CHROME;
 const fixtures = process.env.CRM_SETTINGS_QA_FIXTURES;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 test('CRM settings matches control center layout and supports tabs, help, routing and validation', {skip: !chromePath || !fixtures}, async () => {
-    let origin; const routingRequests=[];
+    let origin; const routingRequests=[], agentRequests=[];
     const server = http.createServer(async (request, response) => {
         const url = new URL(request.url, 'http://localhost');
         if (['/settings', '/limited-settings'].includes(url.pathname)) {
@@ -23,6 +23,10 @@ test('CRM settings matches control center layout and supports tabs, help, routin
         if (url.pathname.endsWith('/routing')) {
             let body='';for await (const chunk of request)body+=chunk;
             routingRequests.push(JSON.parse(body));response.setHeader('Content-Type','application/json');response.end(JSON.stringify({channel:{}}));return;
+        }
+        if (url.pathname === '/settings/crm/agents' && request.method === 'POST') {
+            let body=''; for await (const chunk of request) body+=chunk;
+            agentRequests.push(body); response.setHeader('Content-Type','text/html');response.end(fs.readFileSync(path.join(fixtures,'settings.html'),'utf8'));return;
         }
         if (url.pathname === '/settings/crm/tags' && request.method==='POST') {
             let body='';for await(const chunk of request)body+=chunk;
@@ -64,8 +68,9 @@ test('CRM settings matches control center layout and supports tabs, help, routin
         };
         await send('Page.enable');
         const navigate = async (page='settings',query='') => {
+            const previousOrigin = await evaluate('performance.timeOrigin');
             await send('Page.navigate',{url:origin+'/'+page+query});
-            for(let i=0;i<100;i++){await delay(50);if(await evaluate(`document.readyState==='complete' && !!document.querySelector('[data-settings-root]')?.dataset.activeTab`))return;}
+            for(let i=0;i<100;i++){await delay(50);if(await evaluate(`performance.timeOrigin!==${previousOrigin} && document.readyState==='complete' && !!document.querySelector('[data-settings-root]')?.dataset.activeTab`))return;}
             throw Error('Settings did not initialize');
         };
         const click = async selector => {
@@ -114,9 +119,16 @@ test('CRM settings matches control center layout and supports tabs, help, routin
         await delay(200);
         assert.equal(routingRequests.at(-1)?.routing_enabled,false);
         assert.equal(routingRequests.at(-1)?.fallback_user_id,await evaluate(`window.__fallback`));
-        await screenshot('routing-advanced-1366');
+        await click('.sc-agent-row input[type=checkbox][name=routing_enabled]');
+        await evaluate(`const agentForm=document.querySelector('.sc-agent-row');agentForm.querySelector('select[name="routing_tag_ids[]"]').selectedIndex=0;agentForm.requestSubmit()`);
+        await delay(200);
+        assert.ok(agentRequests.at(-1)?.includes('name="routing_tag_ids[]"'),'Agent category selection must be submitted');
+        assert.equal(await evaluate(`new FormData(document.querySelector('.sc-agent-row')).getAll('routing_enabled').at(-1)`),'0','Unchecking routing must submit false');
+        assert.ok(await evaluate(`document.querySelector('.sc-agent-row [data-sc-form-feedback]').textContent.includes('tersimpan')`));
         await click('#sc-routing-dialog [data-sc-close]');
+        assert.equal(await evaluate(`document.getElementById('sc-routing-dialog').open`),false,'Routing dialog must close with pointer click');
         await click('[data-sc-tab=tags]');
+        assert.equal(await evaluate(`document.querySelector('[data-settings-root]').dataset.activeTab`),'tags');
         await evaluate(`const form=document.querySelector('[data-sc-tag-builder]');form.action=${JSON.stringify(origin+'/settings/crm/tags')};form.elements.name.value='Jepang';form.requestSubmit()`);await delay(150);
         assert.ok(await evaluate(`document.querySelector('[data-sc-tag-builder] [data-sc-form-feedback]').textContent.includes('Nama tag sudah digunakan')`));
         await navigate();
@@ -126,9 +138,20 @@ test('CRM settings matches control center layout and supports tabs, help, routin
         await click('.sc-page-header [data-sc-help-toggle]');
         await navigate();
         assert.equal(await evaluate(`document.querySelector('[data-settings-root]').classList.contains('sc-help-collapsed')`),true,'Help collapse state should persist');
+        await send('Emulation.setDeviceMetricsOverride',{width:900,height:1000,deviceScaleFactor:1,mobile:false});
+        await click('.sc-page-header [data-sc-help-toggle]');
+        assert.equal(await evaluate(`getComputedStyle(document.querySelector('.sc-help nav')).display`),'grid','Desktop collapsed preference must not hide tips in the mobile drawer');
+        await click('.sc-help>header [data-sc-help-toggle]');
+        await send('Emulation.setDeviceMetricsOverride',{width:1366,height:1000,deviceScaleFactor:1,mobile:false});
         await click('.sc-page-header [data-sc-help-toggle]');
         await navigate();
         assert.equal(await evaluate(`document.querySelector('[data-sc-coach]').hidden`),true,'Coach mark should only appear on first visit');
+        await navigate('settings','?tab=routing');
+        await click('[data-sc-open=sc-routing-dialog]');
+        await screenshot('routing-advanced-1366');
+        await evaluate(`document.querySelector('.sc-agent-row').scrollIntoView({block:'center'})`);
+        await screenshot('routing-agent-categories-1366');
+        await evaluate(`document.getElementById('sc-routing-dialog').close()`);
         await navigate('limited-settings');
         assert.equal(await evaluate(`!!document.querySelector('.mc-advanced')`),false);
     } finally { socket?.close(); chrome.kill('SIGTERM'); server.closeAllConnections?.(); await new Promise(resolve => server.close(resolve)); }
