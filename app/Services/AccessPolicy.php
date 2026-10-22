@@ -317,7 +317,7 @@ class AccessPolicy
                 return 'candidate.assign';
             }
 
-            return in_array($action, ['index', 'show']) ? 'candidate.read.basic' : ($action === 'destroy' ? 'candidate.close' : 'candidate.update.profile');
+            return in_array($action, ['index', 'show']) ? 'candidate.read.basic' : (in_array($action, ['destroy', 'archive'], true) ? 'candidate.close' : 'candidate.update.profile');
         }
         if ($prefix === 'applications') {
             return match ($action) {

@@ -357,6 +357,7 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
+    Route::post('calon-pekerja/{candidate}/archive', [CandidateController::class, 'archive'])->name('candidates.archive');
     Route::resource('calon-pekerja', CandidateController::class)->parameters(['calon-pekerja' => 'candidate'])->names('candidates');
 
     Route::resource('mitra-sponsor', CompanyController::class)->parameters(['mitra-sponsor' => 'company'])->names('companies');
