@@ -95,11 +95,11 @@ class CrmWorkspace
         return view($view, [...$data, 'kpis' => $this->kpis($summary), 'filters' => $filters]);
     }
 
-    public function visiblePermissions(Request $request, iterable $candidates): void
+    public function visiblePermissions(Request $request, iterable $candidates, array $names = ['candidate.read.contact', 'candidate.read.identity']): void
     {
         $ids = collect($candidates)->pluck('id')->all();
         $permissions = [];
-        foreach (['candidate.read.contact', 'candidate.read.identity'] as $permission) {
+        foreach ($names as $permission) {
             $policies = app(AccessPolicy::class)->policies($request->user(), $permission);
             if (collect($policies)->contains(fn ($policy) => $policy['scope'] === 'OPERATIONAL_ALL')) {
                 $permissions[$permission] = $ids;

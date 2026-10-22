@@ -13,11 +13,11 @@ class Candidate extends Model
     use HasFactory;
     use SoftDeletes;
 
-    protected $fillable = ['candidate_code', 'status', 'registered_at', 'created_by'];
+    protected $fillable = ['candidate_code', 'status', 'registered_at', 'created_by', 'preferences'];
 
     protected function casts(): array
     {
-        return ['registered_at' => 'datetime'];
+        return ['registered_at' => 'datetime', 'preferences' => 'array'];
     }
 
     public function person(): BelongsTo

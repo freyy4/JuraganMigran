@@ -15,7 +15,7 @@ class Person extends Model
 
     protected $table = 'persons';
 
-    protected $fillable = ['full_name', 'nik', 'birth_place', 'birth_date', 'gender', 'phone', 'whatsapp', 'email', 'address', 'education_level', 'marital_status'];
+    protected $fillable = ['full_name', 'nik', 'birth_place', 'birth_date', 'gender', 'phone', 'whatsapp', 'email', 'address', 'education_level', 'marital_status', 'nationality', 'current_job', 'languages', 'height_cm', 'weight_kg'];
 
     protected function casts(): array
     {
