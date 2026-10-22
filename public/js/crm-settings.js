@@ -4,6 +4,9 @@
     const tabs = [...root.querySelectorAll('[data-sc-tab]')];
     const csrf = root.querySelector('input[name=_token]')?.value;
     const feedback = root.querySelector('[data-sc-feedback]');
+    const preference = 'jm-crm-settings-' + document.body.dataset.uiUser;
+    const remember = (key, value) => { try { localStorage.setItem(preference + '-' + key, value); } catch {} };
+    const recalled = key => { try { return localStorage.getItem(preference + '-' + key); } catch { return null; } };
     const showFeedback = (node, text, error = false) => {
         if (!node) return;
         node.textContent = text; node.hidden = !text;
@@ -12,6 +15,7 @@
     function activate(tab, history = true) {
         if (!tabs.some(item => item.dataset.scTab === tab)) tab = 'channel';
         root.dataset.activeTab = tab;
+        remember('tab', tab);
         tabs.forEach(item => { const active = item.dataset.scTab === tab; item.setAttribute('aria-selected', String(active)); item.tabIndex = active ? 0 : -1; });
         root.querySelectorAll('[data-sc-section]').forEach(section => { section.hidden = tab === 'channel' ? section.dataset.scSection === 'automation' : section.dataset.scSection !== tab; });
         root.querySelectorAll('[data-sc-help-item]').forEach(item => item.setAttribute('aria-current', String(item.dataset.scHelpItem === tab)));
@@ -38,14 +42,15 @@
         activate(tabs[next].dataset.scTab); tabs[next].focus();
     });
     addEventListener('popstate', () => activate(new URLSearchParams(location.search).get('tab') || 'channel', false));
-    activate(root.dataset.initialTab, false);
+    activate(new URLSearchParams(location.search).has('tab') ? root.dataset.initialTab : recalled('tab') || root.dataset.initialTab, false);
     const coach = root.querySelector('[data-sc-coach]');
-    const preference = 'jm-crm-settings-' + document.body.dataset.uiUser;
-    try { coach.hidden = !!localStorage.getItem(preference + '-coach'); } catch {}
+    coach.hidden = recalled('coach') === 'seen';
+    if (!coach.hidden) remember('coach', 'seen');
     root.querySelector('[data-sc-dismiss]').onclick = () => { coach.hidden = true; try { localStorage.setItem(preference + '-coach', 'seen'); } catch {} };
     const desktopHelp = matchMedia('(min-width:1280px)');
+    root.classList.toggle('sc-help-collapsed', recalled('help-collapsed') === 'true');
     const syncHelp = () => root.querySelectorAll('[data-sc-help-toggle]').forEach(button => button.setAttribute('aria-expanded', String(desktopHelp.matches ? !root.classList.contains('sc-help-collapsed') : root.classList.contains('sc-help-open'))));
-    root.querySelectorAll('[data-sc-help-toggle]').forEach(button => button.addEventListener('click', () => { root.classList.toggle(desktopHelp.matches ? 'sc-help-collapsed' : 'sc-help-open'); syncHelp(); }));
+    root.querySelectorAll('[data-sc-help-toggle]').forEach(button => button.addEventListener('click', () => { root.classList.toggle(desktopHelp.matches ? 'sc-help-collapsed' : 'sc-help-open'); if (desktopHelp.matches) remember('help-collapsed', String(root.classList.contains('sc-help-collapsed'))); syncHelp(); }));
     desktopHelp.addEventListener('change', syncHelp); syncHelp();
     root.addEventListener('keydown', event => { if (event.key === 'Escape') { root.classList.remove('sc-help-open'); syncHelp(); } });
     root.addEventListener('input', event => {
@@ -94,10 +99,26 @@
     if (routing && details) {
         const channelSelect = routing.elements.channel_id;
         const selected = () => channels.find(row => String(row.id) === channelSelect.value);
+        const syncFallbackOptions = () => {
+            const team = details.elements.team_id.value;
+            for (const option of details.elements.fallback_user_id.options) option.disabled = !!team && !!option.value && option.dataset.team !== team;
+        };
+        details.elements.team_id.addEventListener('change', () => {
+            syncFallbackOptions();
+            if (details.elements.fallback_user_id.selectedOptions[0]?.disabled) details.elements.fallback_user_id.value = '';
+        });
+        const syncRoutingState = () => {
+            const row = selected();
+            const text = root.querySelector('[data-sc-routing-state]');
+            text.textContent = (row.routing_enabled === false || row.routing_enabled === 0) ? 'Penugasan otomatis dijeda; pesan tetap masuk ke Inbox.' : row.routing_method === 'MANUAL' ? 'Antrean manual — supervisor menentukan owner.' : 'Penugasan otomatis aktif.';
+        };
         const populate = () => {
             const row = selected(); if (!row) return;
             routing.querySelectorAll('[name=routing_method]').forEach(input => input.checked = input.value === row.routing_method);
             details.elements.team_id.value = row.team_id || '';
+            details.elements.routing_enabled.checked = row.routing_enabled !== false && row.routing_enabled !== 0;
+            details.elements.fallback_user_id.value = row.fallback_user_id || '';
+            syncFallbackOptions(); syncRoutingState();
             details.elements.prefer_existing_owner.checked = !!row.prefer_existing_owner;
             details.elements.strict_owner.checked = !!row.strict_owner;
             let hours = {}; try { hours = JSON.parse(row.business_hours || '{}') || {}; } catch {}
@@ -109,7 +130,7 @@
             if (!details.reportValidity() || !routing.reportValidity() || routing.dataset.saving) return;
             const row = selected(), status = form.querySelector('[data-sc-form-feedback]') || routing.querySelector('[data-sc-routing-feedback]');
             const method = routing.querySelector('[name=routing_method]:checked').value;
-            const payload = {name:row.name,team_id:details.elements.team_id.value || null,routing_method:method,prefer_existing_owner:details.elements.prefer_existing_owner.checked,strict_owner:details.elements.strict_owner.checked,hours_start:details.elements.hours_start.value,hours_end:details.elements.hours_end.value};
+            const payload = {routing_enabled:details.elements.routing_enabled.checked,fallback_user_id:details.elements.fallback_user_id.value ? Number(details.elements.fallback_user_id.value) : null,name:row.name,team_id:details.elements.team_id.value || null,routing_method:method,prefer_existing_owner:details.elements.prefer_existing_owner.checked,strict_owner:details.elements.strict_owner.checked,hours_start:details.elements.hours_start.value,hours_end:details.elements.hours_end.value};
             routing.dataset.saving = 'true'; const button = form.querySelector('button:not([type=button])'); button.disabled = true;
             showFeedback(status, 'Menyimpan routing…');
             try {
@@ -117,6 +138,7 @@
                 const result = await response.json();
                 if (!response.ok) throw Error(Object.values(result.errors || {}).flat().join(' ') || result.message || 'Routing belum tersimpan.');
                 Object.assign(row, payload); row.business_hours = payload.hours_start ? JSON.stringify({start:payload.hours_start,end:payload.hours_end}) : null;
+                syncRoutingState();
                 showFeedback(status, 'Tim dan routing tersimpan. Owner existing tetap mengikuti kebijakan penugasan.');
                 showFeedback(feedback, 'Routing ' + row.name + ' diperbarui.');
             } catch (error) { showFeedback(status, error.message || 'Koneksi terputus; periksa pengaturan sebelum mencoba lagi.', true); }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CrmRoutingSettings;
 use App\Services\CsRouter;
 use App\Services\WhatsAppProviderFailure;
 use App\Services\WhatsAppQrGateway;
@@ -88,7 +89,9 @@ class WhatsAppQrController extends Controller
             abort_unless($request->user()->hasPermission('WHATSAPP_CHANNEL_MANAGE_TEAM'), 403);
         }
 
-        return $this->result(fn () => $this->sessions->lease($channel, function () use ($channel, $data): array {
+        $extras = app(CrmRoutingSettings::class)->channelValues($request, $this->sessions->channel($channel), isset($data['team_id']) ? (int) $data['team_id'] : null);
+
+        return $this->result(fn () => $this->sessions->lease($channel, function () use ($channel, $data, $extras): array {
             $state = $this->sessions->refresh($channel);
             if ($state['state'] !== 'CONNECTED' || $state['health'] !== 'HEALTHY') {
                 throw new WhatsAppProviderFailure('REAUTH_REQUIRED');
@@ -96,7 +99,7 @@ class WhatsAppQrController extends Controller
             if (! empty($data['team_id']) && ! collect(app(MetaConnectController::class)->teams())->contains('id', $data['team_id'])) {
                 abort(422, 'Tim tidak memiliki CS aktif yang berizin.');
             }
-            DB::table('whatsapp_channels')->where('id', $channel)->update(['team_id' => $data['team_id'] ?? null, 'routing_method' => $data['routing_method'], 'prefer_existing_owner' => $data['prefer_existing_owner'], 'strict_owner' => $data['strict_owner'], 'business_hours' => ! empty($data['hours_start']) ? json_encode(['days' => [1, 2, 3, 4, 5], 'start' => $data['hours_start'], 'end' => $data['hours_end']]) : null, 'status' => 'CONNECTED', 'is_active' => true]);
+            DB::table('whatsapp_channels')->where('id', $channel)->update($extras + ['team_id' => $data['team_id'] ?? null, 'routing_method' => $data['routing_method'], 'prefer_existing_owner' => $data['prefer_existing_owner'], 'strict_owner' => $data['strict_owner'], 'business_hours' => ! empty($data['hours_start']) ? json_encode(['days' => [1, 2, 3, 4, 5], 'start' => $data['hours_start'], 'end' => $data['hours_end']]) : null, 'status' => 'CONNECTED', 'is_active' => true]);
             DB::table('whatsapp_qr_sessions')->where('channel_id', $channel)->update(['activated' => true]);
             $this->sessions->audit($channel, 'routing_configured');
 

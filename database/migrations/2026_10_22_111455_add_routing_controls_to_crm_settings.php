@@ -6,23 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::table('crm_settings', function (Blueprint $table) {
-            //
+        Schema::table('whatsapp_channels', function (Blueprint $table): void {
+            $table->boolean('routing_enabled')->default(true);
+            $table->foreignId('fallback_user_id')->nullable()->constrained('users')->nullOnDelete();
+        });
+        Schema::table('crm_agent_profiles', function (Blueprint $table): void {
+            $table->boolean('routing_enabled')->default(true);
+            $table->json('routing_tag_ids')->nullable();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::table('crm_settings', function (Blueprint $table) {
-            //
+        Schema::table('crm_agent_profiles', function (Blueprint $table): void {
+            $table->dropColumn(['routing_enabled', 'routing_tag_ids']);
+        });
+        Schema::table('whatsapp_channels', function (Blueprint $table): void {
+            $table->dropConstrainedForeignId('fallback_user_id');
+            $table->dropColumn('routing_enabled');
         });
     }
 };

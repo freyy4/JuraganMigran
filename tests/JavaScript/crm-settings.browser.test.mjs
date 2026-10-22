@@ -76,7 +76,7 @@ test('CRM settings matches control center layout and supports tabs, help, routin
         const screenshot = async name => {const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(fixtures,name+'.png'),Buffer.from(data.data,'base64'));};
         for(const width of [1672,1366,900,390]) {
             await send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<768});
-            await navigate();await delay(200);
+            await navigate('settings','?tab=channel');await delay(200);
             await evaluate(`localStorage.setItem('jm-crm-settings-'+document.body.dataset.uiUser+'-coach','seen');document.querySelector('[data-sc-coach]').hidden=true;`);
             assert.equal(await evaluate(`document.querySelectorAll('[data-sc-tab]').length`),7);
             assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth`),true,'No horizontal page overflow at '+width);
@@ -110,10 +110,25 @@ test('CRM settings matches control center layout and supports tabs, help, routin
         assert.equal(routingRequests.at(-1)?.routing_method,'LEAST_ACTIVE');
         assert.equal(routingRequests.at(-1)?.prefer_existing_owner,true);
         await click('[data-sc-open=sc-routing-dialog]');assert.equal(await evaluate(`document.getElementById('sc-routing-dialog').open`),true);
+        await evaluate(`const details=document.querySelector('[data-sc-routing-details]');details.elements.routing_enabled.checked=false;details.elements.fallback_user_id.selectedIndex=1;window.__fallback=Number(details.elements.fallback_user_id.value);details.requestSubmit()`);
+        await delay(200);
+        assert.equal(routingRequests.at(-1)?.routing_enabled,false);
+        assert.equal(routingRequests.at(-1)?.fallback_user_id,await evaluate(`window.__fallback`));
+        await screenshot('routing-advanced-1366');
         await click('#sc-routing-dialog [data-sc-close]');
         await click('[data-sc-tab=tags]');
         await evaluate(`const form=document.querySelector('[data-sc-tag-builder]');form.action=${JSON.stringify(origin+'/settings/crm/tags')};form.elements.name.value='Jepang';form.requestSubmit()`);await delay(150);
         assert.ok(await evaluate(`document.querySelector('[data-sc-tag-builder] [data-sc-form-feedback]').textContent.includes('Nama tag sudah digunakan')`));
+        await navigate();
+        assert.equal(await evaluate(`document.querySelector('[data-settings-root]').dataset.activeTab`),'tags','Last tab should restore without an explicit query');
+        await navigate('settings','?tab=pipeline');
+        assert.equal(await evaluate(`document.querySelector('[data-settings-root]').dataset.activeTab`),'pipeline','Explicit deep links must override saved tabs');
+        await click('.sc-page-header [data-sc-help-toggle]');
+        await navigate();
+        assert.equal(await evaluate(`document.querySelector('[data-settings-root]').classList.contains('sc-help-collapsed')`),true,'Help collapse state should persist');
+        await click('.sc-page-header [data-sc-help-toggle]');
+        await navigate();
+        assert.equal(await evaluate(`document.querySelector('[data-sc-coach]').hidden`),true,'Coach mark should only appear on first visit');
         await navigate('limited-settings');
         assert.equal(await evaluate(`!!document.querySelector('.mc-advanced')`),false);
     } finally { socket?.close(); chrome.kill('SIGTERM'); server.closeAllConnections?.(); await new Promise(resolve => server.close(resolve)); }

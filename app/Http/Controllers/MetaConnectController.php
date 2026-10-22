@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\ConversationCrm;
+use App\Services\CrmRoutingSettings;
 use App\Services\CsRouter;
 use App\Services\MetaConnect;
 use App\Services\MetaConnectFailure;
@@ -218,7 +219,9 @@ class MetaConnectController extends Controller
     {
         $data = $request->validate(['name' => 'required|string|max:100', 'team_id' => 'nullable|integer|min:1', 'routing_method' => 'required|in:ROUND_ROBIN,LEAST_ACTIVE,MANUAL', 'prefer_existing_owner' => 'required|boolean', 'strict_owner' => 'required|boolean', 'hours_start' => 'nullable|date_format:H:i|required_with:hours_end', 'hours_end' => 'nullable|date_format:H:i|after:hours_start|required_with:hours_start']);
 
-        return $this->result(function () use ($channel, $data): array {
+        $extras = app(CrmRoutingSettings::class)->channelValues($request, DB::table('whatsapp_channels')->where('provider', 'META_CLOUD_API')->find($channel) ?? abort(404), isset($data['team_id']) ? (int) $data['team_id'] : null);
+
+        return $this->result(function () use ($channel, $data, $extras): array {
             $row = $this->connect->health(DB::table('whatsapp_channels')->where('provider', 'META_CLOUD_API')->find($channel) ?? abort(404));
             if (! $row->inbound_test_at || ! $row->outbound_test_at) {
                 throw new MetaConnectFailure('TEST_REQUIRED');
@@ -226,7 +229,7 @@ class MetaConnectController extends Controller
             if (! empty($data['team_id']) && ! collect($this->teams())->contains('id', $data['team_id'])) {
                 throw new MetaConnectFailure('ASSET_NOT_ALLOWED');
             }
-            $values = array_intersect_key($data, array_flip(['name', 'team_id', 'routing_method', 'prefer_existing_owner', 'strict_owner']));
+            $values = $extras + array_intersect_key($data, array_flip(['name', 'team_id', 'routing_method', 'prefer_existing_owner', 'strict_owner']));
             $values['team_id'] ??= null;
             $values['business_hours'] = ! empty($data['hours_start']) ? json_encode(['days' => [1, 2, 3, 4, 5], 'start' => $data['hours_start'], 'end' => $data['hours_end']]) : null;
             $values += ['status' => 'CONNECTED', 'connected_at' => now(), 'updated_at' => now()];

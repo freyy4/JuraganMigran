@@ -40,6 +40,7 @@ class CrmSettingsControlCenterTest extends TestCase
                 mkdir($directory, 0775, true);
             }
             file_put_contents($directory.'/limited-settings.html', $view->getContent());
+            DB::table('crm_tags')->insert(['name' => 'Program Jepang', 'category' => 'PROGRAM', 'color_token' => 'blue', 'created_at' => now(), 'updated_at' => now()]);
             file_put_contents($directory.'/settings.html', $this->actingAs($this->admin())->get(route('crm.settings'))->assertOk()->getContent());
         }
         Http::assertNothingSent();

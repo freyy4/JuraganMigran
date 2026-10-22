@@ -414,7 +414,7 @@ class ConversationCrmController extends Controller
     {
         $request->validate(['tab' => 'sometimes|nullable|string|in:channel,routing,tags,replies,pipeline,templates,automation']);
         $user = $request->user();
-        $channelFields = ['id', 'name', 'provider', 'display_phone_number', 'status', 'team_id', 'routing_method', 'strict_owner', 'prefer_existing_owner', 'is_active', 'business_hours', 'last_webhook_at', 'last_error', 'connection_method', 'verified_name', 'quality_rating', 'webhook_ready', 'last_health_check_at', 'inbound_test_at', 'outbound_test_at', 'connected_at'];
+        $channelFields = ['id', 'name', 'provider', 'routing_enabled', 'fallback_user_id', 'display_phone_number', 'status', 'team_id', 'routing_method', 'strict_owner', 'prefer_existing_owner', 'is_active', 'business_hours', 'last_webhook_at', 'last_error', 'connection_method', 'verified_name', 'quality_rating', 'webhook_ready', 'last_health_check_at', 'inbound_test_at', 'outbound_test_at', 'connected_at'];
         if ($user->hasPermission('WHATSAPP_CONNECTION_ADVANCED')) {
             $channelFields = array_merge($channelFields, ['waba_id', 'phone_number_id']);
         }
@@ -445,11 +445,20 @@ class ConversationCrmController extends Controller
 
     public function saveAgent(Request $request): RedirectResponse
     {
-        $data = $request->validate(['user_id' => 'required|integer|exists:users,id', 'availability' => 'required|in:ONLINE,BUSY,AWAY,OFFLINE', 'conversation_cap' => 'required|integer|min:1|max:200']);
+        $data = $request->validate(['user_id' => 'required|integer|exists:users,id', 'availability' => 'required|in:ONLINE,BUSY,AWAY,OFFLINE', 'conversation_cap' => 'required|integer|min:1|max:200', 'routing_enabled' => 'sometimes|required|boolean', 'update_routing_tags' => 'sometimes|boolean', 'routing_tag_ids' => 'sometimes|array|max:100', 'routing_tag_ids.*' => ['required', 'integer', 'distinct', Rule::exists('crm_tags', 'id')->where('is_active', true)]]);
         $agent = User::findOrFail($data['user_id']);
         $all = collect(app(AccessPolicy::class)->policies($request->user(), 'crm.routing.manage'))->contains('scope', 'OPERATIONAL_ALL');
         abort_unless($agent->is_active && $agent->hasPermission('crm.conversation.reply') && ($all || ($request->user()->team_id && $agent->team_id === $request->user()->team_id)), 403);
-        DB::table('crm_agent_profiles')->updateOrInsert(['user_id' => $agent->id], ['availability' => $data['availability'], 'conversation_cap' => $data['conversation_cap'], 'updated_at' => now()]);
+        $values = ['availability' => $data['availability'], 'conversation_cap' => $data['conversation_cap'], 'updated_at' => now()];
+        if (array_key_exists('routing_enabled', $data)) {
+            $values['routing_enabled'] = $data['routing_enabled'];
+        }
+        if (array_key_exists('routing_tag_ids', $data)) {
+            $values['routing_tag_ids'] = json_encode(array_map('intval', $data['routing_tag_ids']));
+        } elseif ($request->boolean('update_routing_tags')) {
+            $values['routing_tag_ids'] = '[]';
+        }
+        DB::table('crm_agent_profiles')->updateOrInsert(['user_id' => $agent->id], $values);
         app(AccessPolicy::class)->audit($request->user(), 'crm.agent_configured', $data);
 
         return back()->with('success', 'Ketersediaan dan kapasitas CS diperbarui.');

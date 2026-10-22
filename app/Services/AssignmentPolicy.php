@@ -54,14 +54,28 @@ class AssignmentPolicy
                 return null;
             }
         }
-        $profiles = DB::table('crm_agent_profiles')->whereIn('user_id', $eligible->pluck('id'))->get()->keyBy('user_id');
-        $counts = DB::table('crm_conversations')->where('status', 'OPEN')->whereIn('assigned_user_id', $eligible->pluck('id'))->groupBy('assigned_user_id')->selectRaw('assigned_user_id, COUNT(*) AS total')->pluck('total', 'assigned_user_id');
-        $eligible = $eligible->filter(fn ($u) => ($profiles[$u->id]->availability ?? 'ONLINE') === 'ONLINE' && ($counts[$u->id] ?? 0) < ($profiles[$u->id]->conversation_cap ?? 30));
-        if ($channel->routing_method === 'MANUAL') {
+        if ($channel->routing_method === 'MANUAL' || ! ($channel->routing_enabled ?? true)) {
             return null;
         }
+        $profiles = DB::table('crm_agent_profiles')->whereIn('user_id', $eligible->pluck('id'))->get()->keyBy('user_id');
+        $counts = DB::table('crm_conversations')->where('status', 'OPEN')->whereIn('assigned_user_id', $eligible->pluck('id'))->groupBy('assigned_user_id')->selectRaw('assigned_user_id, COUNT(*) AS total')->pluck('total', 'assigned_user_id');
+        $available = $eligible->filter(fn (User $user): bool => ($profiles[$user->id]->availability ?? 'ONLINE') === 'ONLINE'
+            && ($profiles[$user->id]->routing_enabled ?? true)
+            && ($counts[$user->id] ?? 0) < ($profiles[$user->id]->conversation_cap ?? 30));
+        $leadTags = DB::table('crm_lead_tags')->join('crm_tags', 'crm_tags.id', '=', 'crm_lead_tags.tag_id')
+            ->where('lead_id', $lead->id)->where('crm_tags.is_active', true)->pluck('tag_id')->all();
+        $eligible = $available->filter(function (User $user) use ($profiles, $leadTags, $channel): bool {
+            if ($user->id === ($channel->fallback_user_id ?? null)) {
+                return false;
+            }
+            $skills = json_decode($profiles[$user->id]->routing_tag_ids ?? '[]', true) ?? [];
+
+            return ! $skills || (bool) array_intersect($skills, $leadTags);
+        });
+        if ($eligible->isEmpty()) {
+            return $available->firstWhere('id', $channel->fallback_user_id ?? null)?->id;
+        }
         if ($channel->routing_method === 'LEAST_ACTIVE') {
-            $counts = DB::table('crm_conversations')->where('status', 'OPEN')->whereIn('assigned_user_id', $eligible->pluck('id'))->groupBy('assigned_user_id')->selectRaw('assigned_user_id, COUNT(*) AS total')->pluck('total', 'assigned_user_id');
 
             return $eligible->sortBy(fn ($u) => $counts[$u->id] ?? 0)->first()?->id;
         }

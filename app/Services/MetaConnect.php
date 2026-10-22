@@ -268,6 +268,11 @@ class MetaConnect
 
     public function safeChannel(object $channel): array
     {
-        return array_intersect_key((array) $channel, array_flip(['id', 'name', 'display_phone_number', 'verified_name', 'quality_rating', 'status', 'connection_method', 'team_id', 'routing_method', 'prefer_existing_owner', 'strict_owner', 'business_hours', 'is_active', 'webhook_ready', 'last_webhook_at', 'last_health_check_at', 'last_error', 'inbound_test_at', 'outbound_test_at', 'connected_at']));
+        $values = array_intersect_key((array) $channel, array_flip(['id', 'name', 'routing_enabled', 'fallback_user_id', 'display_phone_number', 'verified_name', 'quality_rating', 'status', 'connection_method', 'team_id', 'routing_method', 'prefer_existing_owner', 'strict_owner', 'business_hours', 'is_active', 'webhook_ready', 'last_webhook_at', 'last_health_check_at', 'last_error', 'inbound_test_at', 'outbound_test_at', 'connected_at']));
+        if (array_key_exists('routing_enabled', $values)) {
+            $values['routing_enabled'] = (bool) $values['routing_enabled'];
+        }
+
+        return $values;
     }
 }
