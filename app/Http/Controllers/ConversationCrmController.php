@@ -372,11 +372,22 @@ class ConversationCrmController extends Controller
     public function finishFollowUp(Request $request, int $lead, int $followup): RedirectResponse
     {
         $this->crm->leads($request, 'crm.followup.manage')->where('id', $lead)->first() ?? abort(404);
-        $data = $request->validate(['status' => 'required|in:COMPLETED,CANCELLED', 'outcome' => 'required|string|max:255']);
+        $data = $request->validate(['status' => 'required|in:COMPLETED,CANCELLED,RESCHEDULED', 'outcome' => 'required|string|max:255', 'due_at' => 'required_if:status,RESCHEDULED|nullable|date_format:Y-m-d\\TH:i', 'expected_due_at' => 'required_if:status,RESCHEDULED|nullable|date']);
         DB::transaction(function () use ($request, $lead, $followup, $data): void {
             DB::table('acquisition_leads')->where('id', $lead)->lockForUpdate()->first();
             $row = DB::table('crm_follow_ups')->where('id', $followup)->where('lead_id', $lead)->where('status', 'SCHEDULED')->first() ?? abort(404);
-            DB::table('crm_follow_ups')->where('id', $row->id)->update($data + ['completed_at' => now(), 'updated_at' => now()]);
+            if ($data['status'] === 'RESCHEDULED') {
+                if (! Carbon::parse($data['expected_due_at'])->equalTo(Carbon::parse($row->due_at))) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['due_at' => 'Jadwal telah berubah. Muat ulang sebelum menyimpan.']);
+                }
+                $due = Carbon::parse($data['due_at'], 'Asia/Jakarta')->utc();
+                DB::table('crm_follow_ups')->where('id', $row->id)->update(['due_at' => $due, 'updated_at' => now()]);
+                $this->crm->nextFollowUp($lead);
+                $this->crm->activity($lead, 'followup_scheduled', 'Jadwal ulang '.$due->copy()->timezone('Asia/Jakarta')->format('d M Y H:i').' WIB: '.$data['outcome'], $request->user()->id);
+
+                return;
+            }
+            DB::table('crm_follow_ups')->where('id', $row->id)->update(['status' => $data['status'], 'outcome' => $data['outcome'], 'completed_at' => now(), 'updated_at' => now()]);
             $this->crm->nextFollowUp($lead);
             $this->crm->activity($lead, 'followup_completed', $data['status'].': '.$data['outcome'], $request->user()->id);
         });

@@ -123,7 +123,22 @@ class CandidateWorkspace
         if (! $current) {
             $currentStage = 'Lead';
         }
-        $processStages = collect(array_keys(config('candidate-dashboard.stages')))->map(fn (string $label): array => ['label' => $label, 'current' => $label === $currentStage]);
+        $visited = collect();
+        if ($current && $permissions['timeline'] && $policy->applicationIds($request->user(), 'candidate.read.timeline')->where('applications.id', $current->id)->exists()) {
+            $names = DB::table('application_stage_histories as history')->join('pipeline_stages as stage', 'stage.id', '=', 'history.to_stage_id')->where('history.application_id', $current->id)->get(['stage.name', 'stage.code']);
+            foreach ($names as $stage) {
+                foreach (config('candidate-dashboard.stages') as $label => $patterns) {
+                    if (collect($patterns)->contains(fn (string $pattern): bool => str_contains(mb_strtolower($stage->code.' '.$stage->name), $pattern))) {
+                        $visited->push($label);
+                        break;
+                    }
+                }
+            }
+        }
+        if ($current && $candidate->registered_at) {
+            $visited->push('Lead');
+        }
+        $processStages = collect(array_keys(config('candidate-dashboard.stages')))->map(fn (string $label): array => ['label' => $label, 'current' => $label === $currentStage, 'completed' => $label !== $currentStage && $visited->contains($label)]);
         $source = $leads->first()?->crm_source;
 
         return compact('canCommunicate', 'canPrint', 'nextActions', 'documentDashboard', 'documentRows', 'readiness', 'processStages', 'source');
