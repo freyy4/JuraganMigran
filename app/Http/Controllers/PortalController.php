@@ -235,7 +235,7 @@ class PortalController extends Controller
             'request' => route('portal.api.request'), 'profile' => route('portal.api.profile.update'),
             'read' => route('portal.api.read', ['notification' => '__ID__']), 'contact' => route('portal.api.contact'),
             'preferences' => route('portal.preferences'), 'revoke' => route('portal.revokeSessions'),
-            'logout' => route('portal.logout'), 'login' => route('portal.login'), 'travel' => route('portal.holiday'),
+            'logout' => route('portal.logout'), 'login' => route('portal.login'), 'travel' => route('portal.holiday'), 'welfare' => config('care.enabled') ? route('portal.welfare') : null,
         ]];
     }
 

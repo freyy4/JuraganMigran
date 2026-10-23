@@ -119,6 +119,11 @@ class CareJourney
     {
         $this->authorize($user, $candidate, 'incident.create');
 
+        return $this->createIssue($user, $candidate, $data);
+    }
+
+    private function createIssue(User $user, Candidate $candidate, array $data): int
+    {
         return DB::transaction(function () use ($user, $candidate, $data): int {
             Candidate::whereKey($candidate->id)->lockForUpdate()->firstOrFail();
             $existing = DB::table('care_issues')->where('request_key', $data['request_key'])->first();
@@ -135,11 +140,30 @@ class CareJourney
                 abort_unless($related, 422, 'Partner harus terkait dengan perjalanan CPMI.');
             }
             [$ack, $action] = config('care.sla_minutes.'.$data['severity']);
-            $id = DB::table('care_issues')->insertGetId(['request_key' => $data['request_key'], 'candidate_id' => $candidate->id, 'application_id' => $application?->id, 'partner_id' => $partnerId, 'opened_by' => $user->id, 'owner_id' => $user->id, 'category' => $data['category'], 'severity' => $data['severity'], 'status' => 'OPEN', 'verification' => 'REPORTED', 'details' => Crypt::encryptString(json_encode(['description' => $data['description']])), 'version' => 1, 'ack_due_at' => now()->addMinutes($ack), 'action_due_at' => now()->addMinutes($action), 'created_at' => now(), 'updated_at' => now()]);
+            $id = DB::table('care_issues')->insertGetId(['request_key' => $data['request_key'], 'candidate_id' => $candidate->id, 'application_id' => $application?->id, 'partner_id' => $partnerId, 'opened_by' => $user->id, 'owner_id' => $application?->assigned_cs_id, 'category' => $data['category'], 'severity' => $data['severity'], 'status' => 'OPEN', 'verification' => 'REPORTED', 'details' => Crypt::encryptString(json_encode(['description' => $data['description']])), 'version' => 1, 'ack_due_at' => now()->addMinutes($ack), 'action_due_at' => now()->addMinutes($action), 'created_at' => now(), 'updated_at' => now()]);
             $this->event($candidate, 'issue:'.$id.':open', 'issue_opened', ['title' => 'Insiden dibuka', 'issue_id' => $id, 'severity' => $data['severity'], 'category' => $data['category']], 'incident.read', $user, $application?->id);
             $this->monitorIssue($id);
 
             return $id;
+        });
+    }
+
+    public function portalCheck(User $user, Candidate $candidate, array $data): void
+    {
+        abort_unless(config('care.enabled') && DB::table('portal_accounts')->where('user_id', $user->id)->where('candidate_id', $candidate->id)->where('status', 'active')->exists(), 403);
+        DB::transaction(function () use ($user, $candidate, $data): void {
+            Candidate::withoutGlobalScopes()->whereKey($candidate->id)->lockForUpdate()->firstOrFail();
+            $key = 'welfare:'.$data['request_key'];
+            if (DB::table('care_events')->where('source_key', $key)->exists()) {
+                abort_unless(DB::table('care_events')->where('source_key', $key)->where('candidate_id', $candidate->id)->where('actor_id', $user->id)->exists(), 409);
+
+                return;
+            }
+            $this->event($candidate, $key, 'welfare_check', ['title' => 'Welfare check CPMI: '.config('care.welfare_outcomes.'.$data['status']), 'status' => $data['status'], 'note' => $data['note'] ?? ''], 'incident.read', $user, stage: 'lpk');
+            if (in_array($data['status'], ['ILL', 'SAFETY', 'EMERGENCY'], true)) {
+                $this->createIssue($user, $candidate, ['request_key' => $data['request_key'], 'category' => $data['status'] === 'SAFETY' ? 'PEER' : 'HEALTH', 'severity' => ['ILL' => 'S2', 'SAFETY' => 'S3', 'EMERGENCY' => 'S4'][$data['status']], 'description' => 'CPMI melaporkan: '.config('care.welfare_outcomes.'.$data['status']).'. '.($data['note'] ?? '')]);
+            }
+            app(AccessPolicy::class)->audit($user, 'care.portal_welfare_check', ['candidate_id' => $candidate->id]);
         });
     }
 
@@ -317,9 +341,11 @@ class CareJourney
         }
         if ($application && app(AccessPolicy::class)->applicationIds($user, 'health.mcu.summary.read')->where('applications.id', $application->id)->exists()) {
             $mcu = DB::table('medical_events')->where('application_id', $application->id)->where('status', 'completed')->where('clearance_status', 'fit')->orderByDesc('completed_at')->first();
+            $policy = json_decode($this->template($application)->policy ?? '{}', true);
+            $lpkDays = $policy['post_mcu_lpk_days'] ?? config('care.post_mcu_lpk_days');
             $enrolled = DB::table('training_enrollments')->where('application_id', $application->id)->whereNotNull('joined_at')->whereNotIn('status', ['cancelled', 'withdrawn'])->exists();
-            if ($mcu && ! $enrolled && $mcu->completed_at && Carbon::parse($mcu->completed_at)->addDays(config('care.post_mcu_lpk_days'))->isPast()) {
-                $signals[] = ['level' => 2, 'reason' => 'MCU memenuhi syarat; onboarding LPK melewati SLA '.config('care.post_mcu_lpk_days').' hari', 'action' => 'Prioritaskan onboarding LPK dan evaluasi kebutuhan transport'];
+            if ($mcu && ! $enrolled && $mcu->completed_at && Carbon::parse($mcu->completed_at)->addDays($lpkDays)->isPast()) {
+                $signals[] = ['level' => 2, 'reason' => 'MCU memenuhi syarat; onboarding LPK melewati SLA '.$lpkDays.' hari', 'action' => 'Prioritaskan onboarding LPK dan evaluasi kebutuhan transport'];
             }
         }
         $meaningful = $events->first(fn (object $event): bool => in_array($event->event_type, ['message_received', 'message_sent', 'touchpoint', 'followup_completed'], true));
@@ -355,7 +381,7 @@ class CareJourney
     {
         $canIdentity = $this->allowed($user, $candidate, 'candidate.read.identity');
         $vacancies = \App\Models\Vacancy::whereIn('id', app(AccessPolicy::class)->vacancyIds($user, 'job_order.read'))->whereIn('status', ['active', 'published', 'open'])->with(['jobOrder.country', 'jobOrder.company', 'currentRequirements.definition'])->orderByDesc('id')->limit(20)->get();
-        $options = $vacancies->map(function (\App\Models\Vacancy $vacancy) use ($candidate, $canIdentity): array {
+        $options = $vacancies->map(function (\App\Models\Vacancy $vacancy) use ($user, $candidate, $canIdentity): array {
             $fields = ['age' => $canIdentity ? $candidate->person?->birth_date?->age : null, 'age_years' => $canIdentity ? $candidate->person?->birth_date?->age : null, 'height_cm' => $canIdentity ? $candidate->person?->height_cm : null, 'weight_kg' => $canIdentity ? $candidate->person?->weight_kg : null, 'education' => $candidate->person?->education_level, 'education_level' => $candidate->person?->education_level, 'gender' => $canIdentity ? $candidate->person?->gender : null, 'languages' => $candidate->person?->languages];
             $checks = [];
             $failed = false;
@@ -384,12 +410,14 @@ class CareJourney
                 $gaps = $gaps || $passed === null;
             }
             $gaps = $gaps || $checks === [];
+            $quality = $this->partnerQuality($user, $candidate, $vacancy->jobOrder?->company_id);
+            $partnerPenalty = $quality['sample'] >= config('care.minimum_partner_sample') ? min(10, ($quality['substantiated'] ?? 0) * 2) : 0;
             $preference = (int) ($candidate->preferences['target_country_id'] ?? 0) === (int) $vacancy->jobOrder?->country_id;
             $match = $failed ? 'NOT_ELIGIBLE' : ($gaps ? 'MATCH_WITH_GAPS' : 'MATCH');
             $score = $checks === [] ? 0 : (int) round(collect($checks)->where('result', 'Sesuai')->count() / count($checks) * 100);
 
-            return ['vacancy_id' => $vacancy->id, 'title' => $vacancy->title, 'country' => $vacancy->jobOrder?->country?->name, 'partner' => $vacancy->jobOrder?->company?->name, 'match' => $match, 'score' => $score, 'preference' => $preference, 'checks' => $checks, 'explanation' => ($preference ? 'Sesuai negara pilihan. ' : '').'Kecocokan persyaratan terstruktur; kapasitas LPK, dukungan dan hasil partner tetap perlu review manusia.', 'freshness' => $vacancy->updated_at?->toIso8601String()];
-        })->sortByDesc(fn (array $row): int => ($row['match'] === 'NOT_ELIGIBLE' ? -1000 : 0) + $row['score'] + ($row['preference'] ? 5 : 0))->take(3)->values();
+            return ['vacancy_id' => $vacancy->id, 'title' => $vacancy->title, 'country' => $vacancy->jobOrder?->country?->name, 'partner' => $vacancy->jobOrder?->company?->name, 'match' => $match, 'score' => $score, 'preference' => $preference, 'partner_penalty' => $partnerPenalty, 'partner_quality' => $quality['label'], 'checks' => $checks, 'explanation' => ($preference ? 'Sesuai negara pilihan. ' : '').'Kecocokan persyaratan terstruktur; kapasitas LPK, dukungan dan hasil partner tetap perlu review manusia.', 'freshness' => $vacancy->updated_at?->toIso8601String()];
+        })->sortByDesc(fn (array $row): int => ($row['match'] === 'NOT_ELIGIBLE' ? -1000 : 0) + $row['score'] + ($row['preference'] ? 5 : 0) - $row['partner_penalty'])->take(3)->values();
         $this->snapshot($candidate, 'routes:user:'.$user->id, $options->all());
 
         return $options;
@@ -422,12 +450,13 @@ class CareJourney
                 $query->orWhere('emergency', true);
             }
         })->orderByDesc('id')->get();
+        $requestableIssues = DB::table('care_issues')->where('candidate_id', $candidate->id)->where('category', 'HEALTH')->whereNotIn('status', ['RESOLVED', 'CLOSED'])->when(! $canIssues, fn ($q) => $q->where('opened_by', $user->id))->get(['id', 'severity']);
         $risk = $this->risk($user, $candidate, $events, $issues, $application);
         $partnerQuality = $this->partnerQuality($user, $candidate, $partner);
         $routes = $this->routes($user, $candidate);
         $automaticRatio = $events->isEmpty() ? 0 : (int) round($events->where('auto_generated', true)->count() / $events->count() * 100);
         app(AccessPolicy::class)->audit($user, 'care.sensitive_view', ['candidate_id' => $candidate->id, 'incidents_visible' => $canIssues]);
 
-        return compact('candidate', 'application', 'template', 'stages', 'events', 'issues', 'supports', 'risk', 'partnerQuality', 'routes', 'automaticRatio');
+        return compact('candidate', 'application', 'template', 'stages', 'events', 'issues', 'supports', 'risk', 'partnerQuality', 'routes', 'automaticRatio', 'requestableIssues');
     }
 }

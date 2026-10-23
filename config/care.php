@@ -8,9 +8,10 @@ return [
     'silent_days' => 7,
     'minimum_partner_sample' => 10,
     'sla_minutes' => ['S1' => [1440, 2880], 'S2' => [60, 180], 'S3' => [15, 30], 'S4' => [0, 0]],
-    'escalation_roles' => [1 => ['supervisor', 'compliance'], 2 => ['admin']],
-    'emergency_approver_roles' => ['admin'],
+    'escalation_roles' => [1 => ['supervisor', 'compliance'], 2 => ['super_admin', 'migration_owner']],
+    'emergency_approver_roles' => ['super_admin', 'migration_owner'],
     'reserve_limit_minor' => (int) env('CARE_EMERGENCY_RESERVE_LIMIT_MINOR', 0),
+    'welfare_outcomes' => ['OK' => 'Baik', 'LIGHT' => 'Ada keluhan ringan', 'TALK' => 'Perlu bicara dengan JM', 'ILL' => 'Sakit / perlu bantuan', 'HOME' => 'Ingin pulang', 'SAFETY' => 'Ada masalah keamanan / konflik', 'EMERGENCY' => 'Perlu bantuan darurat'],
     'outcomes' => ['CONTINUE' => 'Lanjut proses', 'UNSURE' => 'Masih ragu', 'WITHDRAWAL' => 'Ingin mundur', 'FAMILY' => 'Masalah keluarga', 'FINANCIAL' => 'Masalah ekonomi', 'PARTNER' => 'Masalah LPK/PT', 'WELFARE' => 'Masalah kesehatan/welfare', 'PEER' => 'Konflik teman', 'UNREACHABLE' => 'Tidak bisa dihubungi', 'OTHER' => 'Lainnya'],
     'support_types' => [
         'family_assurance' => ['label' => 'Keluarga belum setuju', 'action' => 'Family Assurance Call', 'icon' => 'users', 'financial' => false],

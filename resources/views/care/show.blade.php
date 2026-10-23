@@ -35,6 +35,7 @@
     </div>
     <nav class="care-deep-links" aria-label="Detail operasional"><a href="#care-supports">Support</a><a href="#care-incidents">Incident & Welfare</a><a href="#care-partner">Partner Experience</a><a href="#care-route">Route Analysis</a></nav>
     @include('care.operations')
+    @include('care.program-policy')
     @include('care.dialogs')
 </div>
 @endsection

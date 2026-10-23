@@ -58,6 +58,19 @@ class MedicalEventController extends Controller
             $data['expires_at'] = null;
         }
 
+        if (config('care.enabled') && \Illuminate\Support\Facades\Schema::hasColumn('care_journey_templates', 'policy')) {
+            $application = Application::whereKey($data['application_id'])->firstOrFail();
+            $policy = json_decode(app(\App\Services\CareJourney::class)->template($application)->policy ?? '{}', true);
+            if ($policy['consent_required'] ?? false) {
+                $typeId = $policy['consent_document_type_id'] ?? null;
+                $documents = app(\App\Services\DocumentRequirementEngine::class)->rows($application);
+                $consent = $documents->first(fn (array $row): bool => (int) $row['rule']->document_type_id === (int) $typeId);
+                if (! $typeId || ! $consent || ! $consent['verified']) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['application_id' => 'Izin keluarga terverifikasi wajib sebelum MCU untuk program ini.']);
+                }
+            }
+        }
+
         return $data;
     }
 

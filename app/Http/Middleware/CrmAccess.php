@@ -78,7 +78,7 @@ class CrmAccess
                 }
             }
         }
-        if ($request->routeIs('documents.download', 'documents.review', 'document-operations.preview', 'document-operations.workspace')) {
+        if ($request->routeIs('documents.download', 'documents.review', 'care.document-checks', 'document-operations.preview', 'document-operations.workspace')) {
             $document = $request->route('document');
             $classification = $document?->documentType?->sensitive_class ?? 'DOCUMENT';
             $needed = match ($classification) {

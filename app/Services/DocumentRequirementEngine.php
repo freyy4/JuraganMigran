@@ -24,7 +24,7 @@ class DocumentRequirementEngine
     {
         $version = app(ScopedTemplateResolver::class)->resolve($application, 'document_requirement_sets', 'document_requirement_versions', 'document_requirement_set_id');
         if ($version) {
-            return DB::table('document_requirement_rules')->where('document_requirement_version_id', $version->id)->where('is_active', true)->orderBy('sort_order')->orderBy('id')->get()->map(function ($row): object {
+            $requirements = DB::table('document_requirement_rules')->where('document_requirement_version_id', $version->id)->where('is_active', true)->orderBy('sort_order')->orderBy('id')->get()->map(function ($row): object {
                 $row->source_key = 'rule-'.$row->id;
                 $row->condition_rule = $row->condition_rule ? json_decode($row->condition_rule, true) : null;
                 $row->is_required = $row->required_level !== 'OPTIONAL';
@@ -33,15 +33,36 @@ class DocumentRequirementEngine
 
                 return $row;
             });
-        }
-
-        return $application->vacancy->documentRequirements()->with('documentType')->where('is_active', true)->orderBy('sort_order')->get()->map(function ($row): object {
+        } else {
+        $requirements = $application->vacancy->documentRequirements()->with('documentType')->where('is_active', true)->orderBy('sort_order')->get()->map(function ($row): object {
             $row->source_key = (string) $row->id;
             $row->required_level = $row->condition_rule ? 'CONDITIONAL' : ($row->is_required ? 'REQUIRED' : 'OPTIONAL');
             $row->expiry_policy = 'VALID';
 
             return $row;
         });
+        }
+
+        if (config('care.enabled') && \Illuminate\Support\Facades\Schema::hasColumn('care_journey_templates', 'policy')) {
+            $policy = json_decode(app(CareJourney::class)->template($application)->policy ?? '{}', true);
+            $ids = collect();
+            if ($policy['consent_required'] ?? false) {
+                $ids->push($policy['consent_document_type_id'] ?? null);
+            }
+            $status = $application->candidate->person?->marital_status;
+            $ids->push($policy['marital_documents'][$status ?? ''] ?? null);
+            foreach ($ids->filter()->unique() as $typeId) {
+                if ($requirements->contains('document_type_id', (int) $typeId)) {
+                    continue;
+                }
+                $type = DocumentType::find($typeId);
+                if ($type) {
+                    $requirements->push((object) ['id' => 'care-'.$typeId, 'source_key' => 'care-'.$typeId, 'document_type_id' => $typeId, 'documentType' => $type, 'stage_id' => null, 'condition_rule' => null, 'is_required' => true, 'required_level' => 'REQUIRED', 'expiry_policy' => 'NONE', 'minimum_validity_days' => 0, 'original_required' => false, 'must_verify_before_exit' => true, 'notes' => 'Persyaratan izin / status keluarga dari template negara.']);
+                }
+            }
+        }
+
+        return $requirements;
     }
 
     public function documents(Application $application): Collection
@@ -83,6 +104,14 @@ class DocumentRequirementEngine
             }
             $valid = $document && $document->file_path && Storage::disk('documents')->exists($document->file_path) && ! in_array($status, ['needs_correction', 'rejected', 'expired'], true) && ! $minimumInvalid;
             $verified = $valid && $document->status === 'verified';
+            if ($verified && config('care.enabled') && \Illuminate\Support\Facades\Schema::hasTable('care_document_checks')) {
+                $policy = json_decode(app(CareJourney::class)->template($application)->policy ?? '{}', true);
+                if (in_array((int) $rule->document_type_id, $policy['teto_document_type_ids'] ?? [], true)) {
+                    $check = DB::table('care_document_checks')->where('candidate_document_id', $document->id)->first();
+                    $checks = $check ? json_decode($check->checks, true) : [];
+                    $verified = count(array_filter($checks)) === 5;
+                }
+            }
             $owner = match ($status) {
                 'missing', 'needs_correction', 'rejected', 'expired' => 'CPMI_ACTION', default => $document?->action_owner ?? 'INTERNAL_REVIEW'
             };

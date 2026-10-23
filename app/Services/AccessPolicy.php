@@ -315,6 +315,8 @@ class AccessPolicy
         if ($prefix === 'care') {
             return match ($action) {
                 'template' => 'admin.master_data.manage',
+                'document-checks' => 'document.verify',
+                'exit-review' => 'candidate.close',
                 'issue' => 'incident.create',
                 'issue-status' => 'incident.update',
                 'verify' => 'incident.escalate',

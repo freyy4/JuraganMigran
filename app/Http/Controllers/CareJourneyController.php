@@ -96,15 +96,64 @@ class CareJourneyController extends Controller
 
     public function template(Request $request, string $country): RedirectResponse
     {
-        $data = $request->validate(['version' => 'required|integer|min:1', 'stages' => 'required|array|min:1|max:20', 'stages.*.key' => 'required|string|alpha_dash|max:60|distinct', 'stages.*.label' => 'required|string|max:100']);
+        $data = $request->validate(['version' => 'required|integer|min:1', 'stages' => 'required|array|min:1|max:20', 'stages.*.key' => 'required|string|alpha_dash|max:60|distinct', 'stages.*.label' => 'required|string|max:100', 'policy' => 'nullable|array:consent_required,consent_document_type_id,marital_documents,teto_document_type_ids,post_mcu_lpk_days', 'policy.consent_required' => 'nullable|boolean', 'policy.consent_document_type_id' => 'required_if:policy.consent_required,1|nullable|integer|exists:document_types,id', 'policy.marital_documents' => 'nullable|array:married,divorced,widowed', 'policy.marital_documents.*' => 'nullable|integer|exists:document_types,id', 'policy.teto_document_type_ids' => 'nullable|array|max:30', 'policy.teto_document_type_ids.*' => 'integer|distinct|exists:document_types,id', 'policy.post_mcu_lpk_days' => 'nullable|integer|min:1|max:90']);
+        if (isset($data['policy'])) {
+            $data['policy']['consent_required'] = (bool) ($data['policy']['consent_required'] ?? false);
+            $data['policy']['consent_document_type_id'] = filled($data['policy']['consent_document_type_id'] ?? null) ? (int) $data['policy']['consent_document_type_id'] : null;
+            $data['policy']['marital_documents'] = array_map(fn ($id): ?int => filled($id) ? (int) $id : null, $data['policy']['marital_documents'] ?? []);
+            $data['policy']['teto_document_type_ids'] = array_map('intval', $data['policy']['teto_document_type_ids'] ?? []);
+        }
         DB::transaction(function () use ($country, $data): void {
             $template = DB::table('care_journey_templates')->where('country_code', strtoupper($country))->lockForUpdate()->first() ?? abort(404);
             abort_unless($template->version === $data['version'], 409, 'Template telah berubah.');
-            DB::table('care_journey_templates')->where('id', $template->id)->update(['stages' => json_encode(collect($data['stages'])->pluck('label', 'key')->all()), 'version' => $template->version + 1, 'updated_at' => now()]);
+            DB::table('care_journey_templates')->where('id', $template->id)->update(['stages' => json_encode(collect($data['stages'])->pluck('label', 'key')->all()), 'policy' => json_encode($data['policy'] ?? []), 'version' => $template->version + 1, 'updated_at' => now()]);
         });
         app(AccessPolicy::class)->audit($request->user(), 'care.template_updated', ['country' => $country]);
 
         return back()->with('success', 'Template journey diperbarui.');
+    }
+
+    public function documentChecks(Request $request, Candidate $candidate, \App\Models\CandidateDocument $document): RedirectResponse
+    {
+        $this->care->authorize($request->user(), $candidate, 'document.verify');
+        abort_unless($document->candidate_id === $candidate->id, 404);
+        if ($document->application_id) {
+            abort_unless(app(AccessPolicy::class)->applicationIds($request->user(), 'document.verify')->where('applications.id', $document->application_id)->exists(), 404);
+        }
+        $data = $request->validate(['version' => 'required|integer|min:0', 'checks' => 'required|array:readable,qr_visible,qr_inspected,identity_readable,profile_reconciled', 'checks.readable' => 'required|boolean', 'checks.qr_visible' => 'required|boolean', 'checks.qr_inspected' => 'required|boolean', 'checks.identity_readable' => 'required|boolean', 'checks.profile_reconciled' => 'required|boolean']);
+        DB::transaction(function () use ($request, $candidate, $document, $data): void {
+            \App\Models\CandidateDocument::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            $row = DB::table('care_document_checks')->where('candidate_document_id', $document->id)->first();
+            abort_unless(($row->version ?? 0) === $data['version'], 409, 'Pemeriksaan telah berubah. Muat ulang.');
+            DB::table('care_document_checks')->updateOrInsert(['candidate_document_id' => $document->id], ['checked_by' => $request->user()->id, 'checks' => json_encode($data['checks']), 'version' => $data['version'] + 1, 'created_at' => $row->created_at ?? now(), 'updated_at' => now()]);
+            $this->care->event($candidate, 'document-check:'.$document->id.':'.($data['version'] + 1), 'document_inspected', ['title' => 'Checklist inspeksi TETO diperbarui', 'document_id' => $document->id, 'checks' => $data['checks']], 'document.read.metadata', $request->user(), $document->application_id, stage: 'teto');
+        });
+
+        return back()->with('success', 'Checklist inspeksi disimpan. QR terlihat tidak membuktikan keaslian dokumen.');
+    }
+
+    public function exitReview(Request $request, Candidate $candidate): RedirectResponse
+    {
+        $this->care->authorize($request->user(), $candidate, 'candidate.close');
+        $data = $request->validate(['request_key' => 'required|uuid', 'reason' => ['required', Rule::in(array_keys(config('care.issues')))], 'doubts_started_at' => 'nullable|date|before_or_equal:today', 'preventability' => 'required|in:UNKNOWN,POSSIBLE,UNLIKELY', 'support_needed' => 'nullable|string|max:1000', 'reroute_consent' => 'nullable|boolean', 'note' => 'nullable|string|max:1000']);
+        $this->care->event($candidate, 'exit-review:'.$data['request_key'], 'exit_review', ['title' => 'Exit review CPMI'] + $data, 'incident.read', $request->user());
+        app(AccessPolicy::class)->audit($request->user(), 'care.exit_review', ['candidate_id' => $candidate->id]);
+
+        return back()->with('success', 'Exit review tersimpan. Hak CPMI untuk berhenti tetap dihormati.');
+    }
+
+    public function portalWelfare(Request $request): View|RedirectResponse
+    {
+        abort_unless(config('care.enabled'), 404);
+        $candidate = Candidate::withoutGlobalScopes()->with('person')->findOrFail($request->attributes->get('portal_account')->candidate_id);
+        if ($request->isMethod('post')) {
+            $data = $request->validate(['request_key' => 'required|uuid', 'status' => ['required', Rule::in(array_keys(config('care.welfare_outcomes')))], 'note' => 'nullable|string|max:1000']);
+            $this->care->portalCheck($request->user(), $candidate, $data);
+
+            return to_route('portal.welfare')->with('success', 'Kabar Anda sudah diterima tim JM. Untuk kondisi darurat, segera minta bantuan langsung kepada pendamping atau layanan medis setempat.');
+        }
+
+        return view('portal.welfare', ['data' => ['name' => $candidate->person?->full_name]]);
     }
 
     private function stage(Candidate $candidate, string $stage): void

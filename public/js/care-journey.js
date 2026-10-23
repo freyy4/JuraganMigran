@@ -55,3 +55,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }));
     window.addEventListener('pageshow', () => root.querySelectorAll('form').forEach(form => { delete form.dataset.submitting; form.removeAttribute('aria-busy'); }));
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('[data-care-template-form]');
+    if (!form) return;
+    const container = form.querySelector('[data-care-template-stages]');
+    let next = container.children.length;
+    form.querySelector('[data-care-add-stage]').addEventListener('click', () => {
+        const row = document.createElement('div');
+        row.className = 'care-template-row';
+        for (const [key, text, limit] of [['key', 'Kode tahap', 60], ['label', 'Nama tahap', 100]]) {
+            const label = document.createElement('label');
+            label.textContent = text;
+            const input = document.createElement('input');
+            input.name = `stages[${next}][${key}]`;
+            input.required = true;
+            input.maxLength = limit;
+            label.append(input);
+            row.append(label);
+        }
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.className = 'care-button'; remove.dataset.careRemoveStage = ''; remove.textContent = 'Hapus';
+        row.append(remove); container.append(row); next++;
+        row.querySelector('input').focus();
+    });
+    container.addEventListener('click', event => { const button = event.target.closest('[data-care-remove-stage]'); if (button) button.closest('.care-template-row').remove(); });
+});

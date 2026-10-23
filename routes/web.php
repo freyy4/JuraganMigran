@@ -508,6 +508,8 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     Route::post('jm-care/cpmi/{candidate}/issues/{issue}/status', [\App\Http\Controllers\CareJourneyController::class, 'issueStatus'])->whereNumber('issue')->name('care.issue-status');
     Route::post('jm-care/cpmi/{candidate}/issues/{issue}/verify', [\App\Http\Controllers\CareJourneyController::class, 'verify'])->whereNumber('issue')->name('care.verify');
     Route::post('jm-care/cpmi/{candidate}/supports/{support}/status', [\App\Http\Controllers\CareJourneyController::class, 'supportStatus'])->whereNumber('support')->name('care.support-status');
+    Route::post('jm-care/cpmi/{candidate}/exit-review', [\App\Http\Controllers\CareJourneyController::class, 'exitReview'])->name('care.exit-review');
+    Route::post('jm-care/cpmi/{candidate}/documents/{document}/checks', [\App\Http\Controllers\CareJourneyController::class, 'documentChecks'])->name('care.document-checks');
     Route::post('jm-care/templates/{country}', [\App\Http\Controllers\CareJourneyController::class, 'template'])->name('care.template');
 
     Route::get('tindak-lanjut', [FollowUpWorkspaceController::class, 'index'])->name('follow-ups.index');
@@ -530,10 +532,11 @@ Route::get('portal/invitation/{token}', [PortalController::class, 'invitation'])
 Route::post('portal/invitation/{token}', [PortalController::class, 'activate'])->middleware('throttle:5,1')->block(10, 10)->name('portal.activate');
 Route::middleware(PortalAccess::class)->group(function (): void {
     Route::get('portal', [PortalController::class, 'page'])->name('portal.home');
+    Route::match(['get', 'post'], 'portal/kabar', [\App\Http\Controllers\CareJourneyController::class, 'portalWelfare'])->middleware('throttle:10,1')->name('portal.welfare');
     foreach (['process', 'documents', 'schedules', 'requests', 'help', 'profile', 'privacy', 'notifications'] as $page) {
         Route::get('portal/'.$page, [PortalController::class, 'page'])->defaults('page', $page)->name('portal.'.$page);
     }
-    Route::post('portal/documents/{requirement}/upload', [PortalController::class, 'upload'])->where('requirement', '(?:rule-)?[0-9]+')->middleware('throttle:15,1')->name('portal.upload');
+    Route::post('portal/documents/{requirement}/upload', [PortalController::class, 'upload'])->where('requirement', '(?:(?:rule|care)-)?[0-9]+')->middleware('throttle:15,1')->name('portal.upload');
     Route::get('portal/documents/{document}/file', [PortalController::class, 'file'])->name('portal.document.file');
     Route::post('portal/requests', [PortalController::class, 'requestHelp'])->middleware('throttle:10,1')->name('portal.requests.store');
     Route::post('portal/profile', [PortalController::class, 'profileUpdate'])->middleware('throttle:10,1')->name('portal.profile.update');
