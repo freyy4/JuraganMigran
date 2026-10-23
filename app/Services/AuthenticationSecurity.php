@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Person;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -190,10 +191,37 @@ class AuthenticationSecurity
 
     public function fingerprint(User $user): string
     {
-        $roles = DB::table('crm_roles')->where('id', $user->crm_role_id)->get(['id', 'permissions', 'scope_type', 'scope_refs', 'active']);
-        $assignments = DB::table('user_role_assignments as assignment')->join('crm_roles as role', 'role.id', '=', 'assignment.role_id')->where('assignment.user_id', $user->id)->where('assignment.active', true)->where(fn ($q) => $q->whereNull('assignment.valid_from')->orWhere('assignment.valid_from', '<=', now()))->where(fn ($q) => $q->whereNull('assignment.valid_until')->orWhere('assignment.valid_until', '>', now()))->get(['role.id', 'role.permissions', 'role.scope_type', 'role.scope_refs', 'role.active']);
+        $roles = DB::table('crm_roles')->where('id', $user->crm_role_id)->orderBy('id')->get(['id', 'code', 'permissions', 'scope_type', 'scope_refs', 'active']);
+        $assignments = DB::table('user_role_assignments as assignment')->join('crm_roles as role', 'role.id', '=', 'assignment.role_id')->where('assignment.user_id', $user->id)->where('assignment.active', true)->where(fn ($q) => $q->whereNull('assignment.valid_from')->orWhere('assignment.valid_from', '<=', now()))->where(fn ($q) => $q->whereNull('assignment.valid_until')->orWhere('assignment.valid_until', '>', now()))->orderBy('assignment.id')->get(['assignment.id as assignment_id', 'role.id', 'role.code', 'role.permissions', 'role.scope_type', 'role.scope_refs', 'role.active']);
 
-        return hash('sha256', json_encode([$user->crm_role_id, $roles, $assignments]));
+        $grants = DB::table('scope_grants')->whereIn('assignment_id', $assignments->pluck('assignment_id'))->orderBy('id')->get(['assignment_id', 'scope_type', 'scope_refs']);
+
+        return hash('sha256', json_encode([$user->crm_role_id, $roles, $assignments, $grants]));
+    }
+
+    public function contactChanged(Person $person): void
+    {
+        DB::transaction(function () use ($person): void {
+            $accounts = DB::table('portal_accounts')->whereIn('candidate_id', DB::table('candidates')->where('person_id', $person->id)->select('id'))->get();
+            foreach ($accounts as $account) {
+                $user = User::whereKey($account->user_id)->lockForUpdate()->first();
+                if (! $user) {
+                    continue;
+                }
+                DB::table('portal_accounts')->where('id', $account->id)->update(['status' => 'verification_required', 'phone_verified_at' => null, 'updated_at' => now()]);
+                $changes = ['auth_version' => $user->auth_version + 1, 'remember_token' => bin2hex(random_bytes(30))];
+                if ($person->wasChanged('email')) {
+                    $changes['email_verified_at'] = null;
+                }
+                $user->forceFill($changes)->saveQuietly();
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+                DB::table('auth_devices')->where('user_id', $user->id)->delete();
+                DB::table('auth_challenges')->where('user_id', $user->id)->whereNull('consumed_at')->update(['consumed_at' => now()]);
+                DB::table('auth_reset_tokens')->where('user_id', $user->id)->whereNull('used_at')->update(['used_at' => now()]);
+                DB::table('auth_session_records')->where('user_id', $user->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                DB::afterCommit(fn () => $this->notify($user, 'auth.contact.changed', 'Kontak profil Anda berubah. Hubungi CS untuk verifikasi dan undangan portal baru.'));
+            }
+        });
     }
 
     public function knownDevice(Request $request, User $user): bool

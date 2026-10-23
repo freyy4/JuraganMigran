@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Application;
+use App\Models\Candidate;
 use App\Models\User;
 use App\Services\AuthenticationSecurity;
 use App\Services\AuthenticationThrottle;
@@ -277,6 +278,19 @@ class LoginPortalSecurityTest extends TestCase
         $other = User::factory()->create();
         $this->actingAs($cs)->postJson(route('security.users.revoke', $other))->assertForbidden();
         $this->assertSame(0, $other->fresh()->auth_version);
+    }
+
+    public function test_contact_changes_revoke_old_access_and_require_cs_verification(): void
+    {
+        $user = $this->portalAccount();
+        $this->actingAs($user);
+        $account = DB::table('portal_accounts')->where('user_id', $user->id)->first();
+        $person = Candidate::withoutGlobalScope('access')->findOrFail($account->candidate_id)->person;
+        $person->update(['whatsapp' => '089999888777', 'email' => 'changed@example.test']);
+        $this->assertDatabaseHas('portal_accounts', ['user_id' => $user->id, 'status' => 'verification_required', 'phone_verified_at' => null]);
+        $this->assertNull($user->fresh()->email_verified_at);
+        $this->getJson(route('portal.api.summary'))->assertUnauthorized();
+        $this->postJson(route('auth.cpmi.login'), ['identifier' => '081234567890', 'password' => 'password'])->assertUnauthorized()->assertJsonPath('code', 'INVALID_CREDENTIALS');
     }
 
     public function test_external_or_portal_intended_redirect_is_ignored_for_staff(): void

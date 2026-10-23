@@ -4,3 +4,4 @@
 
 @media(min-width:1101px){.auth-form-content{transform:translateY(24px)}.auth-footer{bottom:4px}}
 a,.auth-text-button{color:#0072df}.auth-submit{color:#fff;background:linear-gradient(110deg,#0876cf,#1179ce)}.auth-input input::placeholder,.auth-support,.auth-footer p{color:#5f7392}
+@media(min-width:1101px){.auth-cpmi .auth-form-content h2{font-size:clamp(27px,2.6vw,38px);white-space:nowrap}.auth-cpmi .auth-subtitle{font-size:21px;line-height:1.4;margin-bottom:32px}.auth-cpmi .auth-footer{bottom:28px}}

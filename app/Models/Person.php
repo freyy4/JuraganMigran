@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\AuthenticationSecurity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class Person extends Model
@@ -24,6 +26,11 @@ class Person extends Model
 
     protected static function booted(): void
     {
+        static::updated(function (Person $person): void {
+            if ($person->wasChanged(['whatsapp', 'email']) && Schema::hasTable('auth_session_records')) {
+                app(AuthenticationSecurity::class)->contactChanged($person);
+            }
+        });
         static::creating(function (Person $person): void {
             $person->uuid ??= (string) Str::uuid();
         });
