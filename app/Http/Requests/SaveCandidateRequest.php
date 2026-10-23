@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Person;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SaveCandidateRequest extends FormRequest
 {
@@ -27,7 +29,7 @@ class SaveCandidateRequest extends FormRequest
             'person.gender' => ['nullable', Rule::in(['male', 'female'])],
             'person.phone' => ['nullable', 'string', 'max:30', 'regex:/^\+?[0-9 ()-]+$/'],
             'person.whatsapp' => ['nullable', 'string', 'max:30', 'regex:/^\+?[0-9 ()-]+$/'],
-            'person.email' => ['nullable', 'email', 'max:255'],
+            'person.email' => ['nullable', 'email', 'max:255', Rule::unique('persons', 'email')->ignore($candidate?->person_id)],
             'person.address' => ['nullable', 'string', 'max:5000'],
             'person.marital_status' => ['nullable', Rule::in(['single', 'married', 'divorced', 'widowed'])],
             'person.education_level' => ['nullable', 'string', 'max:255'],
@@ -55,6 +57,43 @@ class SaveCandidateRequest extends FormRequest
             'contacts.*.is_emergency' => ['required', 'boolean'],
             'contacts.*.is_primary' => ['required', 'boolean'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $person = $this->input('person', []);
+        foreach (['phone', 'whatsapp'] as $field) {
+            if (! empty($person[$field]) && preg_match('/^\+?[0-9 ()-]+$/', $person[$field])) {
+                $phone = preg_replace('/[^0-9]/', '', $person[$field]);
+                $person[$field] = '+'.(str_starts_with($phone, '0') ? '62'.substr($phone, 1) : $phone);
+            }
+        }
+        if (! empty($person['email'])) {
+            $person['email'] = strtolower(trim($person['email']));
+        }
+        $this->merge(['person' => $person]);
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $person = $this->input('person', []);
+            foreach (['phone', 'whatsapp'] as $field) {
+                $number = $person[$field] ?? null;
+                if (! $number) {
+                    continue;
+                }
+                $digits = preg_replace('/[^0-9]/', '', $number);
+                $local = str_starts_with($digits, '62') ? '0'.substr($digits, 2) : $digits;
+                $duplicate = Person::query()->where('id', '!=', $this->route('candidate')?->person_id ?? 0)
+                    ->whereHas('candidates')->where(function ($query) use ($digits, $local): void {
+                        $query->whereIn('phone', ['+'.$digits, $digits, $local])->orWhereIn('whatsapp', ['+'.$digits, $digits, $local]);
+                    })->exists();
+                if ($duplicate) {
+                    $validator->errors()->add('person.'.$field, 'Nomor terhubung dengan CPMI lain. Periksa profil existing sebelum menyimpan.');
+                }
+            }
+        }];
     }
 
     public function messages(): array

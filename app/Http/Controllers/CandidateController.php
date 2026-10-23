@@ -8,12 +8,14 @@ use App\Models\Country;
 use App\Models\Person;
 use App\Services\AccessPolicy;
 use App\Services\CandidateWorkspace;
+use App\Services\CareJourney;
 use App\Services\CrmWorkspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class CandidateController extends Controller
@@ -81,7 +83,7 @@ class CandidateController extends Controller
 
     public function create(): View
     {
-        return view('candidates.form', ['candidate' => new Candidate(['status' => 'lead', 'registered_at' => now()]), 'statuses' => Candidate::statusOptions(), 'countries' => Country::orderBy('name')->get(['id', 'name'])]);
+        return view('candidates.form', ['candidate' => new Candidate(['candidate_code' => 'CPMI-'.Str::ulid(), 'status' => 'lead', 'registered_at' => now()]), 'statuses' => Candidate::statusOptions(), 'profileApplication' => null, 'countries' => Country::orderBy('name')->get(['id', 'name'])]);
     }
 
     public function store(SaveCandidateRequest $request): RedirectResponse
@@ -129,19 +131,32 @@ class CandidateController extends Controller
 
     public function edit(Candidate $candidate): View
     {
-        return view('candidates.form', ['candidate' => $candidate->load(['person', 'contacts']), 'statuses' => Candidate::statusOptions(), 'countries' => Country::orderBy('name')->get(['id', 'name'])]);
+        return view('candidates.form', ['candidate' => $candidate->load(['person', 'contacts']), 'statuses' => Candidate::statusOptions(), 'profileApplication' => $candidate->exists ? $candidate->applications()->latest('id')->first() : null, 'countries' => Country::orderBy('name')->get(['id', 'name'])]);
     }
 
-    public function update(SaveCandidateRequest $request, Candidate $candidate): RedirectResponse
+    public function update(SaveCandidateRequest $request, Candidate $candidate): RedirectResponse|JsonResponse
     {
         $data = $request->validated();
         $data['registered_at'] = Carbon::parse($data['registered_at'], 'Asia/Jakarta')->utc();
-        DB::transaction(function () use ($candidate, $data): void {
+        DB::transaction(function () use ($candidate, $data, $request): void {
+            $locked = Candidate::whereKey($candidate->id)->lockForUpdate()->firstOrFail();
+            if ($request->filled('profile_version') && $request->input('profile_version') !== $locked->updated_at?->toISOString()) {
+                abort(409, 'Profil diubah staf lain. Muat ulang sebelum menyimpan.');
+            }
             $candidate->person()->firstOrFail()->update($data['person']);
             $candidate->update(collect($data)->only(['candidate_code', 'status', 'registered_at', 'preferences'])->all());
             $candidate->contacts()->delete();
             $candidate->contacts()->createMany($data['contacts'] ?? []);
+            $candidate->updated_at = now()->max($locked->updated_at->copy()->addSecond());
+            $candidate->save();
+            app(AccessPolicy::class)->audit($request->user(), 'candidate.profile.updated', ['candidate_id' => $candidate->id]);
+            if (config('care.enabled')) {
+                app(CareJourney::class)->event($candidate, 'profile:'.Str::uuid(), 'CPMI_PROFILE_UPDATED', ['title' => 'Profil CPMI diperbarui'], actor: $request->user(), automatic: true);
+            }
         });
+        if ($request->expectsJson()) {
+            return response()->json(['saved' => true, 'version' => $candidate->fresh()->updated_at->toISOString()]);
+        }
 
         return to_route('candidates.show', $candidate)->with('success', 'Data calon pekerja berhasil diperbarui.');
     }
