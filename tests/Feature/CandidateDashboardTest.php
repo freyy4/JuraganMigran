@@ -44,7 +44,7 @@ class CandidateDashboardTest extends TestCase
             $application->vacancy->documentRequirements()->create(['document_type_id' => $type->id, 'is_required' => true]);
             if ($index < 6) {
                 Storage::disk('documents')->put('test-'.$index.'.pdf', 'Synthetic QA document');
-                CandidateDocument::factory()->create(['candidate_id' => $candidate->id, 'application_id' => $application->id, 'document_type_id' => $type->id, 'file_path' => 'test-'.$index.'.pdf', 'status' => 'verified']);
+                CandidateDocument::create(['candidate_id' => $candidate->id, 'application_id' => $application->id, 'document_type_id' => $type->id, 'file_path' => 'test-'.$index.'.pdf', 'status' => 'verified', 'version' => 1, 'expires_at' => now()->addYear()]);
             }
         }
         $lead = $this->lead($candidate, $user);

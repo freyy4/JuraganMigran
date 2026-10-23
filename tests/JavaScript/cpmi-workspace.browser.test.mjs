@@ -34,8 +34,8 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
         const navigate=async page=>{const previous=await evaluate('performance.timeOrigin');await send('Page.navigate',{url:origin+'/'+page});for(let i=0;i<100;i++){await delay(50);if(await evaluate(`performance.timeOrigin!==${previous}&&document.readyState==='complete'&&!!document.querySelector('.cpmi-root')`))return;}throw Error('Page failed to load');};
         const click=async selector=>{const point=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});};
         const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(fixtures,name+'.png'),Buffer.from(data.data,'base64'));};
-        for(const width of [1672,1366,900,390]){
-          await send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<768});
+        for(const width of [1536,1366,1024,768,390]){
+          await send('Emulation.setDeviceMetricsOverride',{width,height:1024,deviceScaleFactor:1,mobile:width<768});
           await navigate('registry');
           assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'Registry overflow at '+width);
           assert.equal(await evaluate(`document.querySelector('.cpmi-stats').children.length`),4);
@@ -52,12 +52,21 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
           await evaluate('scrollTo(0,0)');await screenshot('registry-'+width);
           await navigate('detail');
           assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'Detail overflow at '+width);
-          if(width>=1280)assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cpmi-detail')).gridTemplateColumns.split(' ').length`),3);
+          if(width>=1280)assert.equal(await evaluate(`getComputedStyle(document.querySelector('.cpmi-detail')).gridTemplateColumns.split(' ').length`),12);
+          await click(width<768?'.cd-mobile-actions [data-cpmi-dialog="cpmi-invite"]':'.cd-actions [data-cpmi-dialog="cpmi-invite"]');
           assert.equal(await evaluate(`document.querySelector('[data-portal-form] button').disabled`),true);
           await click('[name="contact_verified"]');
           assert.equal(await evaluate(`document.querySelector('[data-portal-form] button').disabled`),false);
           await click('[name="contact_verified"]');
           assert.equal(await evaluate(`document.querySelector('[data-portal-form] button').disabled`),true);
+          await click('#cpmi-invite [data-cpmi-dialog-close]');
+          await click('[data-cpmi-tab="activity"]');
+          assert.equal(await evaluate(`document.querySelector('.cd-timeline').hidden`),false);
+          await click('[data-cpmi-tab="summary"]');
+          assert.equal(await evaluate(`document.querySelector('.cd-data').hidden`),false);
+          await click('[data-cpmi-tab="documents"]');
+          assert.equal(await evaluate(`document.querySelector('.cd-documents').hidden`),false);
+          await click('[data-cpmi-tab="summary"]');
           await evaluate('scrollTo(0,0)');await screenshot('detail-'+width);
         }
         await evaluate(`document.documentElement.dataset.theme='dark'`);await screenshot('detail-dark');

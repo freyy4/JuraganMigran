@@ -1,0 +1,30 @@
+<?php
+
+return [
+    'enabled' => env('CARE_JOURNEY_ENABLED', true),
+    'partner_flags' => [],
+    'rule_version' => '8.25.1',
+    'post_mcu_lpk_days' => 7,
+    'silent_days' => 7,
+    'minimum_partner_sample' => 10,
+    'sla_minutes' => ['S1' => [1440, 2880], 'S2' => [60, 180], 'S3' => [15, 30], 'S4' => [0, 0]],
+    'escalation_roles' => [1 => ['supervisor', 'compliance'], 2 => ['admin']],
+    'emergency_approver_roles' => ['admin'],
+    'reserve_limit_minor' => (int) env('CARE_EMERGENCY_RESERVE_LIMIT_MINOR', 0),
+    'outcomes' => ['CONTINUE' => 'Lanjut proses', 'UNSURE' => 'Masih ragu', 'WITHDRAWAL' => 'Ingin mundur', 'FAMILY' => 'Masalah keluarga', 'FINANCIAL' => 'Masalah ekonomi', 'PARTNER' => 'Masalah LPK/PT', 'WELFARE' => 'Masalah kesehatan/welfare', 'PEER' => 'Konflik teman', 'UNREACHABLE' => 'Tidak bisa dihubungi', 'OTHER' => 'Lainnya'],
+    'support_types' => [
+        'family_assurance' => ['label' => 'Keluarga belum setuju', 'action' => 'Family Assurance Call', 'icon' => 'users', 'financial' => false],
+        'trust_pack' => ['label' => 'Perlu penjelasan program', 'action' => 'Trust Pack', 'icon' => 'shield', 'financial' => false],
+        'document_rescue' => ['label' => 'Dokumen kurang jelas', 'action' => 'Pendampingan dokumen', 'icon' => 'file', 'financial' => false],
+        'pickup' => ['label' => 'Butuh penjemputan', 'action' => 'Koordinasi penjemputan', 'icon' => 'route', 'financial' => false],
+        'transport' => ['label' => 'Butuh ongkos datang', 'action' => 'Bantuan transport', 'icon' => 'money', 'financial' => true],
+        'allowance' => ['label' => 'Butuh uang saku', 'action' => 'Bantuan biaya kebutuhan', 'icon' => 'money', 'financial' => true],
+        'emergency_medical' => ['label' => 'Perlu bantuan medis', 'action' => 'Emergency medical support', 'icon' => 'activity', 'financial' => true],
+        'peer_support' => ['label' => 'Konflik dengan teman', 'action' => 'Pendampingan penyelesaian konflik', 'icon' => 'users', 'financial' => false],
+        'partner_review' => ['label' => 'Keluhan layanan LPK/PT', 'action' => 'Review layanan partner', 'icon' => 'message', 'financial' => false],
+        'digital_assistance' => ['label' => 'Perlu bantuan digital', 'action' => 'Bantuan portal', 'icon' => 'help', 'financial' => false],
+        'return_home' => ['label' => 'Meminta pulang', 'action' => 'Dukungan kepulangan', 'icon' => 'route', 'financial' => true],
+        'reroute' => ['label' => 'Perlu evaluasi rute', 'action' => 'Review rute alternatif', 'icon' => 'route', 'financial' => false],
+    ],
+    'issues' => ['HEALTH' => 'Keluhan kesehatan / welfare', 'FAMILY' => 'Keluarga / izin', 'FINANCIAL' => 'Hambatan biaya', 'PARTNER' => 'Layanan partner / LPK', 'PEER' => 'Konflik teman', 'PROPERTY' => 'Laporan insiden properti', 'CONDUCT' => 'Laporan dugaan pelanggaran', 'ACCOMMODATION' => 'Akomodasi / makanan', 'TRAINING' => 'Kualitas pelatihan', 'DOCUMENT' => 'Keterlambatan dokumen', 'TRANSPORT' => 'Transportasi', 'WITHDRAWAL' => 'Permintaan berhenti', 'OTHER' => 'Lainnya / belum diketahui'],
+];
