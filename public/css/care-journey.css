@@ -111,3 +111,26 @@ body.crm-layout #main-content .care-root>.care-panel{margin-top:12px}body.crm-la
 body.crm-layout #main-content .care-root header{flex-wrap:nowrap}body.crm-layout #main-content .care-root .care-workspace{align-items:start}body.crm-layout #main-content .care-root .care-needs{max-height:600px;overflow:auto;scrollbar-width:thin}body.crm-layout #main-content .care-root .care-engines small{font-weight:400}body.crm-layout #main-content .care-root .care-board{grid-auto-columns:minmax(138px,1fr)}@media(max-width:767px){body.crm-layout #main-content .care-root .care-needs{max-height:none;overflow:visible}body.crm-layout #main-content .care-root .care-board{grid-auto-columns:240px}body.crm-layout #main-content .care-root .care-board-panel>header{flex-wrap:wrap}}
 @media(max-width:767px){body.crm-layout #main-content .care-root .care-workspace{align-items:stretch}body.crm-layout #main-content .care-root .care-main{width:100%;max-width:100%}}
 body.crm-layout #main-content .care-root .care-stage>header{flex-direction:row;text-align:left}
+
+html[data-theme=dark] body.crm-layout #main-content .care-root{--care-border:#405574;--care-muted:#b1c4de;--care-ink:#e6eefb}
+html[data-theme=dark] body.crm-layout #main-content .care-root :is(.care-avatar,.care-engines>a>span,.care-need,.care-view-controls button[aria-pressed=true]){background:#1d3a58;color:#c0dfff}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-engines>a:nth-child(2)>span,html[data-theme=dark] body.crm-layout #main-content .care-root .care-need:nth-of-type(3n+3){background:#193e36;color:#b4f2db}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-engines>a:nth-child(3)>span,html[data-theme=dark] body.crm-layout #main-content .care-root .care-need:nth-of-type(4n){background:#372b50;color:#e1caff}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-engines>a:nth-child(4)>span,html[data-theme=dark] body.crm-layout #main-content .care-root .care-need:nth-of-type(3n+2){background:#413322;color:#ffe0b2}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-need .ui-icon{color:inherit}
+html[data-theme=dark] body.crm-layout #main-content .care-root :is(.care-drag-handle,.care-stage-empty){color:#b1c4de}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage{--stage-accent:#6eb6ff}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage:nth-child(6n+2){--stage-bg:#18362f!important;--stage-accent:#42d6b5}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage:nth-child(6n+3){--stage-bg:#352e1f!important;--stage-accent:#edbf63}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage:nth-child(6n+4){--stage-bg:#382633!important;--stage-accent:#ff9bb1}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage:nth-child(6n+5){--stage-bg:#2c2845!important;--stage-accent:#c3a3ff}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage>header>span{color:#10213c}
+html[data-theme=dark] body.crm-layout #main-content .care-root :is(.care-touchpoint,.care-add-touch,.care-add-support){border-color:#4a6382}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-board-note{background:#2d2a47;color:#ded3ff;border-color:#8978bd}
+html[data-theme=dark] body.crm-layout #main-content .care-root :is(.care-risk,.care-risk.risk-0){background:#174233;color:#b0f1d1}
+html[data-theme=dark] body.crm-layout #main-content .care-root :is(.care-risk.risk-1,.care-risk.risk-2,.care-escalation){background:#443222;color:#ffe0ad}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-risk.risk-3{background:#472532;color:#ffc6d4}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-button{background:#213952;color:#b8d8ff;border-color:#4c698e}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-button.primary{background:#245eca;border-color:#447de0;color:#fff}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-button.danger{background:#472532;color:#ffc6d4;border-color:#92536b}
+html[data-theme=dark] body.crm-layout #main-content .care-root :is(.care-ui-icon,.ui-icon){color:#8fbdff}

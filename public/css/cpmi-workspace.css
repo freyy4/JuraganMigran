@@ -129,3 +129,22 @@ body.crm-layout #main-content .cpmi-dashboard .cd-event strong{display:-webkit-b
 body.crm-layout #main-content .cpmi-dashboard #cpmi-history-extra{margin-top:12px}
 @media(min-width:1280px){body.crm-layout #main-content .cpmi-dashboard .cd-grid{grid-template-columns:repeat(4,minmax(0,1.03fr)) repeat(4,minmax(0,1.01fr)) repeat(4,minmax(0,.96fr))}}
 body.crm-layout #main-content .cpmi-dashboard .cd-card>header{flex-direction:row;text-align:left}
+
+/* Match every detail surface to the selected theme, including nested cards. */
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard{--cd-blue:#77b2ff;--cd-ink:#e6eefb;--cd-muted:#b1c3dc;--cd-teal:#37d5b4}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard :is(.cd-button,.cd-card>header>a,.cd-priority){color:#b5d5ff;background:#203751;border-color:#425f82}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard :is(.cd-button.primary,.cd-tabs button[aria-pressed=true],.cd-process .is-current){background:#245eca;border-color:#447de0;color:#fff}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-process .is-current .cd-stage-icon{background:#164798;color:#fff}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard :is(.cd-success,.cd-badges>.cd-success,.cd-process .is-completed){background:#163e35;color:#b2f2d9}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-process .is-completed .cd-stage-icon{background:#086a59;color:white}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard :is(.cd-badges>span:first-child,.cd-meta>.ui-icon){background:#1c3853;color:#a4d7ff}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-next-highlight{border-color:#385377}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-button.danger{background:#432432;color:#ffd0da;border-color:#925061}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-button.cd-wa{background:#116346;color:#e5fff4;border-color:#3d9977}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-gauge-track{stroke:#244b43}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-mini-score circle{stroke:#30425b}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-mini-score circle+circle{stroke:#37d5b4}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard :is(.cd-stage-arrow,.cd-event:before){color:#91aac9;border-color:#425774}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .ui-icon{color:#8cbdff}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard :is(.cd-factors .ui-icon,.cd-document-row .ui-icon,.cd-fields dd>a .ui-icon){color:#59dfb7}
+html[data-theme=dark] body.crm-layout #main-content .cpmi-dashboard .cd-button .ui-icon{color:inherit}
