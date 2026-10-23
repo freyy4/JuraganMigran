@@ -1,0 +1,109 @@
+body.crm-layout #main-content .care-root{--care-surface:var(--form-surface,#fff);--care-border:var(--form-border,#dce6f2);--care-muted:var(--form-muted,#526682);--care-ink:var(--form-text,#14243e);font-size:13px;color:var(--care-ink);line-height:1.45}
+body.crm-layout #main-content .care-root :is(header,section,article,aside,nav,div){box-sizing:border-box;min-width:0}
+body.crm-layout #main-content .care-root header{background:transparent;border:0;padding:0;position:static;box-shadow:none;color:inherit}
+body.crm-layout #main-content .care-root :is(button,a,input,select,textarea):focus-visible{outline:3px solid #318bff;outline-offset:3px}
+body.crm-layout #main-content .care-root .ui-icon{width:20px;height:20px;flex-shrink:0;vertical-align:middle;color:#0967f9}
+body.crm-layout #main-content .care-root h1{font-size:27px;letter-spacing:-.8px;line-height:1.2;margin:0 0 7px}
+body.crm-layout #main-content .care-root h2{display:flex;align-items:center;gap:9px;font-size:15px;line-height:1.3;margin:0 0 7px}
+body.crm-layout #main-content .care-root h3{font-size:12px;margin:0;line-height:1.3}
+body.crm-layout #main-content .care-root p{margin:5px 0 12px;color:var(--care-muted);overflow-wrap:anywhere}
+body.crm-layout #main-content .care-root .care-breadcrumb{font-size:11px;margin-bottom:9px;color:var(--care-muted)}
+body.crm-layout #main-content .care-root .care-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+body.crm-layout #main-content .care-root .care-heading>span{font-size:11px;white-space:nowrap;background:var(--care-surface);border:1px solid var(--care-border);border-radius:8px;padding:9px 12px}
+body.crm-layout #main-content .care-root .care-candidate{display:flex;align-items:center;gap:10px;background:var(--care-surface);border:1px solid var(--care-border);border-radius:11px;padding:9px 12px;margin-bottom:12px;font-size:12px}
+body.crm-layout #main-content .care-root .care-avatar{background:#eaf5ff;color:#0764db;border-radius:50%;width:36px;height:36px;display:grid;place-items:center;font-weight:700;flex-shrink:0}
+body.crm-layout #main-content .care-root .care-candidate small{display:block;color:var(--care-muted);font-size:10px}
+body.crm-layout #main-content .care-root .care-candidate>a:first-of-type{margin-left:auto}
+body.crm-layout #main-content .care-root .care-workspace{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:10px}
+body.crm-layout #main-content .care-root .care-engines{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+body.crm-layout #main-content .care-root .care-engines>a{display:flex;gap:10px;align-items:center;padding:12px 10px;background:var(--care-surface);border:1px solid transparent;border-radius:13px;color:var(--care-ink);text-decoration:none;min-height:90px}
+body.crm-layout #main-content .care-root .care-engines>a[aria-current=true]{border-color:#0094ff;box-shadow:0 0 0 2px #1597ff0d;background:#f0f8ff}
+body.crm-layout #main-content .care-root .care-engines>a>span{padding:10px;border-radius:12px;background:#dff0ff}
+body.crm-layout #main-content .care-root .care-engines>a:nth-child(2)>span{background:#e2f8ee}
+body.crm-layout #main-content .care-root .care-engines>a:nth-child(2) .ui-icon{color:#008c6c}
+body.crm-layout #main-content .care-root .care-engines>a:nth-child(3)>span{background:#eee4ff}
+body.crm-layout #main-content .care-root .care-engines>a:nth-child(3) .ui-icon{color:#7624d7}
+body.crm-layout #main-content .care-root .care-engines>a:nth-child(4)>span{background:#fff0de}
+body.crm-layout #main-content .care-root .care-engines>a:nth-child(4) .ui-icon{color:#d56800}
+body.crm-layout #main-content .care-root .care-engines strong{display:block;font-size:12px;line-height:1.2}
+body.crm-layout #main-content .care-root .care-engines small{display:block;font-size:10px;color:var(--care-muted);margin-top:6px}
+body.crm-layout #main-content .care-root :is(.care-board-panel,.care-needs,.care-panel){background:var(--care-surface);border:1px solid var(--care-border);padding:14px;border-radius:13px}
+body.crm-layout #main-content .care-root .care-board-panel>header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+body.crm-layout #main-content .care-root .care-board-panel>header p{font-size:10px;margin:3px 0 0}
+body.crm-layout #main-content .care-root .care-view-controls{display:flex;gap:3px;white-space:nowrap}
+body.crm-layout #main-content .care-root .care-view-controls button{border:1px solid var(--care-border);border-radius:5px;background:var(--care-surface);color:var(--care-muted);padding:5px 8px;font-size:10px;min-height:28px;width:auto;margin:0}
+body.crm-layout #main-content .care-root .care-view-controls button[aria-pressed=true]{color:#0066ff;background:#edf7ff}
+body.crm-layout #main-content .care-root .care-board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(130px,1fr);gap:8px;overflow-x:auto;scrollbar-width:thin;padding-bottom:5px;align-items:stretch;min-height:360px}
+body.crm-layout #main-content .care-root .care-stage{--stage-bg:#e5f4ff;--stage-accent:#2088f1;background:var(--stage-bg);border:1px solid var(--stage-bg);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;min-height:340px}
+body.crm-layout #main-content .care-root .care-stage:nth-child(6n+2){--stage-bg:#e5f7f1;--stage-accent:#00ad92}
+body.crm-layout #main-content .care-root .care-stage:nth-child(6n+3){--stage-bg:#fff7df;--stage-accent:#e4a500}
+body.crm-layout #main-content .care-root .care-stage:nth-child(6n+4){--stage-bg:#ffedf1;--stage-accent:#ed6381}
+body.crm-layout #main-content .care-root .care-stage:nth-child(6n+5){--stage-bg:#f0eaff;--stage-accent:#9254e8}
+body.crm-layout #main-content .care-root .care-stage>header{display:flex;gap:6px;align-items:center;min-height:53px;margin-bottom:9px}
+body.crm-layout #main-content .care-root .care-stage>header>span{background:var(--stage-accent);color:white;border-radius:50%;width:27px;height:27px;display:grid;place-items:center;flex-shrink:0;font-size:14px}
+body.crm-layout #main-content .care-root .care-stage>header>.ui-icon{width:16px;height:16px;color:var(--stage-accent);margin-left:auto}
+body.crm-layout #main-content .care-root .care-stage>header small{display:block;color:#526682;font-size:9px;margin-top:5px}
+body.crm-layout #main-content .care-root .care-stage-content{display:flex;flex-direction:column;gap:7px;flex:1}
+body.crm-layout #main-content .care-root .care-touchpoint{display:flex;align-items:flex-start;gap:7px;border:1px solid #dbe8ef;border-radius:9px;background:var(--care-surface);padding:10px 7px;box-shadow:0 2px 4px #163c7205;color:var(--care-ink);text-decoration:none}
+body.crm-layout #main-content .care-root .care-touchpoint>.ui-icon{width:18px;height:18px;color:var(--stage-accent);margin-top:3px}
+body.crm-layout #main-content .care-root .care-touchpoint strong{font-size:10px;line-height:1.4;font-weight:500;display:block;overflow-wrap:anywhere}
+body.crm-layout #main-content .care-root .care-touchpoint small{display:block;color:var(--care-muted);font-size:9px;margin-top:6px}
+body.crm-layout #main-content .care-root .care-stage-empty{padding:18px 4px;text-align:center;flex:1;font-size:11px;color:#526682}
+body.crm-layout #main-content .care-root .care-stage-empty small{font-size:10px}
+body.crm-layout #main-content .care-root :is(.care-add-touch,.care-add-support){width:100%;background:var(--care-surface);border:1px dashed #aebfd5;color:var(--care-muted);border-radius:6px;font-size:10px;min-height:28px;padding:5px;margin:0;box-shadow:none}
+body.crm-layout #main-content .care-root .care-add-touch{margin-top:auto}
+body.crm-layout #main-content .care-root .care-board-note{font-size:10px;margin:12px 0 0;padding:8px;background:#f4f1ff;color:#4d3f84;border:1px dashed #aca0f4;border-radius:8px}
+body.crm-layout #main-content .care-root .care-board-note .ui-icon{width:16px;height:16px}
+body.crm-layout #main-content .care-root .care-needs>strong{display:block;font-size:12px;margin-left:29px}
+body.crm-layout #main-content .care-root .care-needs>p{font-size:10px;margin-top:12px}
+body.crm-layout #main-content .care-root .care-needs>input{width:100%;min-height:32px;height:32px;font-size:11px;border-radius:8px;padding:6px;margin:0 0 10px;box-sizing:border-box}
+body.crm-layout #main-content .care-root .care-need{display:flex;gap:8px;align-items:center;min-height:38px;border-radius:8px;background:#e9f5ff;padding:5px 7px;margin-bottom:7px;font-size:11px;color:#15243c}
+body.crm-layout #main-content .care-root .care-need:nth-of-type(3n+2){background:#fff0e4}
+body.crm-layout #main-content .care-root .care-need:nth-of-type(3n+3){background:#e4f8ef}
+body.crm-layout #main-content .care-root .care-need:nth-of-type(4n){background:#f4eaff}
+body.crm-layout #main-content .care-root .care-drag-handle{cursor:grab;touch-action:pan-y;margin:0 0 0 auto;padding:4px;border:0;background:transparent;color:#4c6386;width:25px;min-height:28px;font-size:20px;box-shadow:none;flex-shrink:0}
+body.crm-layout #main-content .care-root .care-stage.is-drop-target{outline:3px solid #098fff;outline-offset:-3px}
+body.crm-layout #main-content .care-root .care-insights{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;align-items:start}
+body.crm-layout #main-content .care-root .care-insights .care-panel{min-height:220px;font-size:11px}
+body.crm-layout #main-content .care-root .care-insights h2{font-size:13px;flex-wrap:wrap}
+body.crm-layout #main-content .care-root .care-insights p{font-size:11px}
+body.crm-layout #main-content .care-root .care-risk{font-size:9px;border-radius:12px;padding:4px 7px;background:#e3faee;color:#007441}
+body.crm-layout #main-content .care-root .care-risk.risk-1{background:#fff3d6;color:#855600}
+body.crm-layout #main-content .care-root .care-risk.risk-2{background:#fff0de;color:#a54900}
+body.crm-layout #main-content .care-root .care-risk.risk-3{background:#ffe6e9;color:#a81e36}
+body.crm-layout #main-content .care-root .care-signal{border:1px solid var(--care-border);border-radius:9px;padding:8px;margin-top:8px}
+body.crm-layout #main-content .care-root .care-next-action{background:#fff7e8;border-radius:10px;padding:12px;color:#172c48}
+body.crm-layout #main-content .care-root .care-next-action p{color:#526682}
+body.crm-layout #main-content .care-root .care-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;width:auto;margin:0;padding:7px 12px;border:1px solid #c4d9f4;border-radius:8px;background:var(--care-surface);color:#0759ce;font-size:12px;line-height:1.4;cursor:pointer;box-shadow:none;white-space:normal;text-decoration:none}
+body.crm-layout #main-content .care-root .care-button.primary{background:#0869ff;color:white;border-color:#0869ff}
+body.crm-layout #main-content .care-root .care-button.danger{border-color:#e8a2ae;background:#fff4f5;color:#ab1531}
+body.crm-layout #main-content .care-root .care-next-action .care-button{margin-top:7px;font-size:11px}
+body.crm-layout #main-content .care-root .care-route-option{padding:10px;background:var(--form-section,#f4f9ff);border-radius:9px;margin:7px 0}
+body.crm-layout #main-content .care-root .care-route-option summary{cursor:pointer;font-size:12px}
+body.crm-layout #main-content .care-root .care-route-option summary span{display:block;font-size:9px;color:var(--care-muted);margin-top:5px}
+body.crm-layout #main-content .care-root .care-deep-links{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+body.crm-layout #main-content .care-root .care-panel[id=care-supports],body.crm-layout #main-content .care-root .care-panel[id=care-incidents]{margin:12px 0}
+body.crm-layout #main-content .care-root .care-operation{border:1px solid var(--care-border);border-radius:10px;padding:12px;margin-top:12px}
+body.crm-layout #main-content .care-root .care-badge{display:inline-block;padding:4px 8px;margin:4px;background:var(--form-section,#f4f8fc);border-radius:10px;font-size:10px}
+body.crm-layout #main-content .care-root .care-operation details{margin-top:10px}
+body.crm-layout #main-content .care-root .care-operation summary{cursor:pointer;color:#0866d6;font-size:12px}
+body.crm-layout #main-content .care-root .care-escalation{background:#fff0e5;color:#8b3d05;border-radius:8px;padding:8px;font-size:12px}
+body.crm-layout #main-content .care-root form{display:grid;gap:10px;margin:12px 0 0;padding:0;border:0;box-shadow:none;background:transparent}
+body.crm-layout #main-content .care-root form label{font-size:12px;margin:0;display:block}
+body.crm-layout #main-content .care-root form :is(input:not([type=hidden]),textarea,select){box-sizing:border-box;display:block;width:100%;min-width:0;margin:5px 0 0;font-size:13px}
+body.crm-layout #main-content .care-root .care-dialog{border:1px solid var(--care-border);border-radius:15px;width:min(540px,calc(100vw - 24px));max-height:85dvh;box-sizing:border-box;padding:22px;overflow:auto;background:var(--care-surface);color:var(--care-ink)}
+body.crm-layout #main-content .care-root .care-dialog::backdrop{background:#061b3e80}
+body.crm-layout #main-content .care-root .care-close{float:right;min-height:36px;width:36px;padding:0;margin:0;border:1px solid var(--care-border);background:transparent;color:var(--care-muted);border-radius:8px;font-size:24px}
+body.crm-layout #main-content .care-root .care-outcomes{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+body.crm-layout #main-content .care-root .care-outcomes .care-button{min-height:44px}
+body.crm-layout #main-content .care-root .care-ledger article{display:grid;grid-template-columns:70px 1fr 150px;gap:12px;border-bottom:1px solid var(--care-border);padding:12px 0;font-size:12px}
+body.crm-layout #main-content .care-root .care-ledger p{grid-column:2/-1}
+body.crm-layout #main-content .care-root [hidden]{display:none!important}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-engines>a[aria-current=true]{background:#152c49}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage{--stage-bg:#182d41!important}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-stage>header small{color:#a6bad7}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-next-action{background:#352c1c;color:#e5eafa}
+html[data-theme=dark] body.crm-layout #main-content .care-root .care-next-action p{color:#b5c7e0}
+@media(max-width:1279px){body.crm-layout #main-content .care-root .care-workspace{grid-template-columns:minmax(0,1fr) 190px}body.crm-layout #main-content .care-root .care-engines{grid-template-columns:1fr 1fr}body.crm-layout #main-content .care-root .care-engines>a{min-height:78px}body.crm-layout #main-content .care-root .care-insights{grid-template-columns:1fr 1fr}}
+@media(max-width:767px){body.crm-layout #main-content .care-root .care-heading{display:block}body.crm-layout #main-content .care-root h1{font-size:24px}body.crm-layout #main-content .care-root .care-heading>span{display:none}body.crm-layout #main-content .care-root .care-candidate{flex-wrap:wrap}body.crm-layout #main-content .care-root .care-workspace{display:flex;flex-direction:column}body.crm-layout #main-content .care-root .care-insights{grid-template-columns:1fr}body.crm-layout #main-content .care-root .care-board{grid-auto-columns:240px}body.crm-layout #main-content .care-root .care-engines>a{padding:10px 8px;gap:7px}body.crm-layout #main-content .care-root .care-engines>a>span{padding:6px}body.crm-layout #main-content .care-root .care-engines strong{font-size:11px}body.crm-layout #main-content .care-root .care-engines small{font-size:10px}body.crm-layout #main-content .care-root .care-board-panel>header{flex-wrap:wrap}body.crm-layout #main-content .care-root :is(.care-button,.care-add-touch,.care-add-support,.care-drag-handle){min-height:44px}body.crm-layout #main-content .care-root .care-drag-handle{width:44px}body.crm-layout #main-content .care-root .care-touchpoint strong{font-size:12px}body.crm-layout #main-content .care-root .care-ledger article{grid-template-columns:1fr}body.crm-layout #main-content .care-root .care-ledger p{grid-column:1}body.crm-layout #main-content .care-root .care-need{font-size:13px}}
+@media(prefers-reduced-motion:no-preference){body.crm-layout #main-content .care-root .care-stage{transition:outline-color .15s}}

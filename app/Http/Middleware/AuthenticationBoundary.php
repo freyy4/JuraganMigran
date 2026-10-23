@@ -83,6 +83,6 @@ class AuthenticationBoundary
             return $request->routeIs('portal.profile.update', 'portal.api.profile.update', 'portal.revokeSessions') || ($request->routeIs('portal.requests.store', 'portal.api.request') && $request->input('type') === 'document_return');
         }
 
-        return $request->routeIs('settings.*', 'security.*', 'auth.sessions.*', 'meta-connect.*', 'whatsapp-qr.*', 'crm.*export*', 'crm.bulk', '*payment*', '*finance*', '*payout*', '*merge*', '*secret*', '*credential*', '*connection*');
+        return $request->routeIs('care.support-status', 'care.template', 'care.decision', 'settings.*', 'security.*', 'auth.sessions.*', 'meta-connect.*', 'whatsapp-qr.*', 'crm.*export*', 'crm.bulk', '*payment*', '*finance*', '*payout*', '*merge*', '*secret*', '*credential*', '*connection*');
     }
 }

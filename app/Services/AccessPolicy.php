@@ -312,6 +312,18 @@ class AccessPolicy
         if ($prefix === 'portal-admin') {
             return $action === 'invite' ? 'candidate.update.profile' : 'candidate.read.basic';
         }
+        if ($prefix === 'care') {
+            return match ($action) {
+                'template' => 'admin.master_data.manage',
+                'issue' => 'incident.create',
+                'issue-status' => 'incident.update',
+                'verify' => 'incident.escalate',
+                'touchpoint', 'support' => 'process.update',
+                'support-status' => 'candidate.read.basic',
+                'decision' => 'process.override',
+                default => 'candidate.read.timeline',
+            };
+        }
         if ($prefix === 'candidates') {
             if (in_array($action, ['create-application', 'store-application'], true)) {
                 return 'candidate.assign';

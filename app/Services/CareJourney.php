@@ -231,6 +231,9 @@ class CareJourney
     public function requestSupport(User $user, Candidate $candidate, array $data): int
     {
         $this->authorize($user, $candidate, 'process.update');
+        if (! config('care.support_types.'.$data['type'].'.financial') && ($data['amount_minor'] ?? 0) > 0) {
+            throw ValidationException::withMessages(['amount_rupiah' => 'Jenis dukungan ini tidak mencakup pencairan dana.']);
+        }
 
         return DB::transaction(function () use ($user, $candidate, $data): int {
             Candidate::whereKey($candidate->id)->lockForUpdate()->firstOrFail();
@@ -260,7 +263,7 @@ class CareJourney
             $financial = config('care.support_types.'.$row->type.'.financial');
             $approval = in_array($data['status'], ['APPROVED', 'REJECTED', 'DISBURSED'], true);
             if ($row->emergency && $approval) {
-                abort_unless(in_array($user->crmRole?->code, config('care.emergency_approver_roles'), true), 403);
+                abort_unless(in_array($user->crmRole()?->code, config('care.emergency_approver_roles'), true), 403);
                 $this->authorize($user, $candidate, 'incident.escalate');
             } else {
                 $this->authorize($user, $candidate, $approval && $financial ? 'finance.cpmi_benefit.write' : 'process.update');

@@ -500,6 +500,16 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     Route::post('data-master/{master}', [MasterDataController::class, 'store'])->name('master-data.store');
     Route::get('data-master/{master}/{record}/edit', [MasterDataController::class, 'edit'])->whereNumber('record')->name('master-data.edit');
     Route::put('data-master/{master}/{record}', [MasterDataController::class, 'update'])->whereNumber('record')->name('master-data.update');
+    Route::get('jm-care', [\App\Http\Controllers\CareJourneyController::class, 'index'])->name('care.index');
+    Route::get('jm-care/cpmi/{candidate}', [\App\Http\Controllers\CareJourneyController::class, 'show'])->name('care.show');
+    foreach (['touchpoint', 'issue', 'support', 'decision'] as $careAction) {
+        Route::post('jm-care/cpmi/{candidate}/'.$careAction, [\App\Http\Controllers\CareJourneyController::class, $careAction])->name('care.'.$careAction);
+    }
+    Route::post('jm-care/cpmi/{candidate}/issues/{issue}/status', [\App\Http\Controllers\CareJourneyController::class, 'issueStatus'])->whereNumber('issue')->name('care.issue-status');
+    Route::post('jm-care/cpmi/{candidate}/issues/{issue}/verify', [\App\Http\Controllers\CareJourneyController::class, 'verify'])->whereNumber('issue')->name('care.verify');
+    Route::post('jm-care/cpmi/{candidate}/supports/{support}/status', [\App\Http\Controllers\CareJourneyController::class, 'supportStatus'])->whereNumber('support')->name('care.support-status');
+    Route::post('jm-care/templates/{country}', [\App\Http\Controllers\CareJourneyController::class, 'template'])->name('care.template');
+
     Route::get('tindak-lanjut', [FollowUpWorkspaceController::class, 'index'])->name('follow-ups.index');
     Route::get('api/crm/follow-ups', [FollowUpWorkspaceController::class, 'index'])->name('follow-ups.api-index');
     Route::post('tindak-lanjut/lamaran/{application}', [FollowUpWorkspaceController::class, 'action'])->name('follow-ups.action');

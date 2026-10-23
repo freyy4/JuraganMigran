@@ -2,19 +2,34 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Attributes\Description;
-use Illuminate\Console\Attributes\Signature;
+use App\Models\Candidate;
+use App\Services\CareJourney;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
-#[Signature('app:monitor-care-journey')]
-#[Description('Command description')]
 class MonitorCareJourney extends Command
 {
-    /**
-     * Execute the console command.
-     */
-    public function handle()
+    protected $signature = 'care:monitor';
+
+    protected $description = 'Normalize journey events and escalate unresolved welfare incidents';
+
+    public function handle(CareJourney $care): int
     {
-        //
+        if (! config('care.enabled')) {
+            return self::SUCCESS;
+        }
+        DB::table('care_issues')->whereNotIn('status', ['RESOLVED', 'CLOSED'])->orderBy('id')->chunkById(100, function ($rows) use ($care): void {
+            foreach ($rows as $row) {
+                $care->monitorIssue($row->id);
+            }
+        });
+        Candidate::withoutGlobalScopes()->whereNull('deleted_at')->orderBy('id')->chunkById(100, function ($candidates) use ($care): void {
+            foreach ($candidates as $candidate) {
+                $care->sync($candidate);
+            }
+        });
+        $this->info('Journey events synchronized; unresolved incident SLA checked.');
+
+        return self::SUCCESS;
     }
 }
