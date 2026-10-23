@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\Candidate;
 use App\Models\User;
+use App\Models\Vacancy;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
@@ -45,8 +46,26 @@ class CareJourney
             foreach (DB::table('medical_events')->where('application_id', $application->id)->get() as $row) {
                 $this->event($candidate, 'medical:'.$row->id.':'.hash('sha256', $row->status.$row->clearance_status.$row->expires_at), 'medical_updated', ['title' => 'Proses MCU diperbarui', 'status' => $row->status, 'clearance' => $row->clearance_status], 'health.mcu.summary.read', application: $application->id, automatic: true, stage: 'mcu', occurred: $row->updated_at);
             }
+            foreach (DB::table('interviews')->where('application_id', $application->id)->get() as $row) {
+                $this->event($candidate, 'interview:'.$row->id.':'.$row->status.':'.$row->outcome, 'interview_updated', ['title' => 'Wawancara: '.$row->status], 'schedule.read', application: $application->id, automatic: true, stage: 'screening', occurred: $row->updated_at);
+            }
+            foreach (DB::table('health_interviews')->where('application_id', $application->id)->get() as $row) {
+                $this->event($candidate, 'screening:'.$row->id.':'.$row->status, 'screening_updated', ['title' => 'Screening awal: '.$row->status], 'health.prescreen.read', application: $application->id, automatic: true, stage: 'screening', occurred: $row->updated_at);
+            }
+            foreach (DB::table('flight_details')->where('application_id', $application->id)->get() as $row) {
+                $this->event($candidate, 'flight:'.$row->id.':'.hash('sha256', $row->departure_at.$row->arrival_at), 'flight_updated', ['title' => 'Jadwal penerbangan diperbarui'], 'schedule.read', application: $application->id, automatic: true, stage: 'flight', occurred: $row->updated_at);
+            }
             foreach (DB::table('training_enrollments')->where('application_id', $application->id)->get() as $row) {
                 $this->event($candidate, 'training:'.$row->id.':'.$row->status, 'training_updated', ['title' => 'Pelatihan: '.$row->status], 'process.read', application: $application->id, automatic: true, stage: 'lpk', occurred: $row->updated_at);
+                if ($row->joined_at && in_array($row->status, ['ongoing', 'on_hold'], true)) {
+                    $days = max(0, (int) Carbon::parse($row->joined_at)->diffInDays(now(), false));
+                    $checkDays = array_unique([1, 3, 7, ...range(14, max(14, min(364, $days)), 7)]);
+                    foreach ($checkDays as $day) {
+                        if ($day <= $days) {
+                            $this->event($candidate, 'welfare-due:'.$row->id.':'.$day, 'welfare_due', ['title' => 'Welfare check LPK hari '.$day.' diperlukan', 'day' => $day], 'incident.read', application: $application->id, automatic: true, stage: 'lpk', occurred: Carbon::parse($row->joined_at)->addDays($day)->toDateTimeString());
+                        }
+                    }
+                }
             }
             foreach (DB::table('application_stage_histories as h')->leftJoin('pipeline_stages as s', 's.id', '=', 'h.to_stage_id')->where('h.application_id', $application->id)->select('h.id', 'h.entered_at', 's.name')->get() as $row) {
                 $this->event($candidate, 'stage:'.$row->id, 'stage_changed', ['title' => 'Tahap: '.($row->name ?: 'Diperbarui')], application: $application->id, automatic: true, occurred: $row->entered_at);
@@ -81,10 +100,13 @@ class CareJourney
             }
 
             return $cache[$key];
-        })->map(function (object $row): object {
+        })->map(function (object $row) use ($user, $candidate): object {
             $row->data = $this->decode($row->payload);
             $expected = hash_hmac('sha256', $row->candidate_id.'|'.$row->source_key.'|'.$row->event_type.'|'.json_encode($row->data, JSON_THROW_ON_ERROR), config('app.key'));
             abort_unless(hash_equals($expected, $row->signature), 409, 'Integritas event perlu ditinjau administrator.');
+            if (($row->event_type === 'welfare_check' || ($row->data['outcome'] ?? null) === 'WELFARE') && ! $this->allowed($user, $candidate, 'health.prescreen.read') && ! $this->allowed($user, $candidate, 'health.mcu.summary.read')) {
+                $row->data = ['title' => 'Welfare check tercatat · rincian kesehatan terbatas'];
+            }
 
             return $row;
         })->values();
@@ -334,6 +356,11 @@ class CareJourney
         } elseif ($active->isNotEmpty()) {
             $signals[] = ['level' => 2, 'reason' => 'Insiden membutuhkan tindak lanjut', 'action' => 'Konfirmasi kondisi dan tindak lanjut Care PIC'];
         }
+        $welfareDue = $events->firstWhere('event_type', 'welfare_due');
+        $welfareCheck = $events->firstWhere('event_type', 'welfare_check');
+        if ($welfareDue && (! $welfareCheck || Carbon::parse($welfareDue->occurred_at)->gt(Carbon::parse($welfareCheck->occurred_at)))) {
+            $signals[] = ['level' => 1, 'reason' => 'Welfare check LPK belum dikonfirmasi', 'action' => 'Konfirmasi kondisi CPMI melalui welfare check'];
+        }
         $lastManual = $events->firstWhere('event_type', 'touchpoint');
         if ($lastManual && in_array($lastManual->data['outcome'] ?? null, ['UNSURE', 'WITHDRAWAL', 'FAMILY', 'FINANCIAL', 'UNREACHABLE'], true)) {
             $outcome = $lastManual->data['outcome'];
@@ -366,12 +393,19 @@ class CareJourney
         }
         $ids = app(AccessPolicy::class)->candidateIds($user, 'incident.read');
         $query = DB::table('care_issues')->where('partner_id', $partnerId)->whereIn('candidate_id', $ids);
-        $sample = (clone $query)->distinct()->count('candidate_id');
-        $verified = (clone $query)->whereNotNull('substantiated_at')->count();
+        $partnerCandidates = DB::table('applications as a')->join('vacancies as v', 'v.id', '=', 'a.vacancy_id')->join('job_orders as j', 'j.id', '=', 'v.job_order_id')->whereNull('a.deleted_at')->where('j.company_id', $partnerId)->whereIn('a.candidate_id', $ids)->pluck('a.candidate_id');
+        $trainingCandidates = DB::table('training_enrollments as e')->join('training_batches as b', 'b.id', '=', 'e.batch_id')->join('applications as a', 'a.id', '=', 'e.application_id')->whereNull('a.deleted_at')->where('b.company_id', $partnerId)->whereIn('a.candidate_id', $ids)->pluck('a.candidate_id');
+        $sample = $partnerCandidates->merge($trainingCandidates)->unique()->count();
+        $verified = (clone $query)->whereNotNull('substantiated_at')->distinct()->count('candidate_id');
+        $lateResponses = (clone $query)->where('ack_due_at', '<', now())->where(fn ($q) => $q->whereNull('acknowledged_at')->orWhereColumn('acknowledged_at', '>', 'ack_due_at'))->distinct()->count('candidate_id');
+        $resolutionTimes = (clone $query)->whereNotNull('resolved_at')->get(['created_at', 'resolved_at'])->map(fn (object $row): float => Carbon::parse($row->created_at)->diffInMinutes(Carbon::parse($row->resolved_at)));
         $unverified = (clone $query)->whereIn('verification', ['REPORTED', 'UNDER_REVIEW'])->count();
         $ackTimes = (clone $query)->whereNotNull('acknowledged_at')->get(['created_at', 'acknowledged_at'])->map(fn (object $row): float => Carbon::parse($row->created_at)->diffInMinutes(Carbon::parse($row->acknowledged_at)));
         $enough = $sample >= config('care.minimum_partner_sample');
-        $result = ['label' => $enough ? ($verified > 0 ? 'Perlu Perhatian' : 'Monitor') : 'Belum cukup data', 'sample' => $sample, 'confidence' => $enough ? 'Memadai untuk review' : 'Rendah', 'score' => null, 'substantiated' => $verified, 'unverified' => $unverified, 'median_ack_minutes' => $ackTimes->median(), 'explanation' => 'Sampel '.$sample.' CPMI dalam cakupan akses. '.$verified.' laporan didukung verifikasi; '.$unverified.' laporan belum diputuskan. Ranking tidak diubah otomatis dari laporan tunggal.'];
+        $weights = config('care.partner_quality_weights');
+        $score = $enough ? max(0, (int) round(100 - ($verified / max(1, $sample) * $weights['substantiated']) - ($lateResponses / max(1, $sample) * $weights['response_sla']))) : null;
+        $label = $score === null ? 'Belum cukup data' : ($score >= 85 ? 'Baik' : ($score >= 70 ? 'Monitor' : ($score >= 50 ? 'Perlu Perhatian' : 'Perlu Evaluasi')));
+        $result = ['label' => $label, 'sample' => $sample, 'confidence' => $enough ? 'Memadai untuk review' : 'Rendah', 'score' => $score, 'late_responses' => $lateResponses, 'median_resolution_minutes' => $resolutionTimes->median(), 'substantiated' => $verified, 'unverified' => $unverified, 'median_ack_minutes' => $ackTimes->median(), 'explanation' => 'Sampel '.$sample.' CPMI dalam cakupan akses. '.$verified.' laporan didukung verifikasi; '.$unverified.' laporan belum diputuskan. Ranking tidak diubah otomatis dari laporan tunggal.'];
         $this->snapshot($candidate, 'partner:user:'.$user->id, $result, $partnerId);
 
         return $result;
@@ -380,8 +414,8 @@ class CareJourney
     public function routes(User $user, Candidate $candidate): Collection
     {
         $canIdentity = $this->allowed($user, $candidate, 'candidate.read.identity');
-        $vacancies = \App\Models\Vacancy::whereIn('id', app(AccessPolicy::class)->vacancyIds($user, 'job_order.read'))->whereIn('status', ['active', 'published', 'open'])->with(['jobOrder.country', 'jobOrder.company', 'currentRequirements.definition'])->orderByDesc('id')->limit(20)->get();
-        $options = $vacancies->map(function (\App\Models\Vacancy $vacancy) use ($user, $candidate, $canIdentity): array {
+        $vacancies = Vacancy::whereIn('id', app(AccessPolicy::class)->vacancyIds($user, 'job_order.read'))->whereIn('status', ['active', 'published', 'open'])->with(['jobOrder.country', 'jobOrder.company', 'currentRequirements.definition'])->orderByDesc('id')->limit(20)->get();
+        $options = $vacancies->map(function (Vacancy $vacancy) use ($user, $candidate, $canIdentity): array {
             $fields = ['age' => $canIdentity ? $candidate->person?->birth_date?->age : null, 'age_years' => $canIdentity ? $candidate->person?->birth_date?->age : null, 'height_cm' => $canIdentity ? $candidate->person?->height_cm : null, 'weight_kg' => $canIdentity ? $candidate->person?->weight_kg : null, 'education' => $candidate->person?->education_level, 'education_level' => $candidate->person?->education_level, 'gender' => $canIdentity ? $candidate->person?->gender : null, 'languages' => $candidate->person?->languages];
             $checks = [];
             $failed = false;
@@ -411,7 +445,7 @@ class CareJourney
             }
             $gaps = $gaps || $checks === [];
             $quality = $this->partnerQuality($user, $candidate, $vacancy->jobOrder?->company_id);
-            $partnerPenalty = $quality['sample'] >= config('care.minimum_partner_sample') ? min(10, ($quality['substantiated'] ?? 0) * 2) : 0;
+            $partnerPenalty = $quality['score'] === null ? 0 : min(10, (int) round((100 - $quality['score']) / 10));
             $preference = (int) ($candidate->preferences['target_country_id'] ?? 0) === (int) $vacancy->jobOrder?->country_id;
             $match = $failed ? 'NOT_ELIGIBLE' : ($gaps ? 'MATCH_WITH_GAPS' : 'MATCH');
             $score = $checks === [] ? 0 : (int) round(collect($checks)->where('result', 'Sesuai')->count() / count($checks) * 100);
@@ -429,14 +463,15 @@ class CareJourney
         $candidate->loadMissing(['person', 'contacts']);
         $application = Application::where('candidate_id', $candidate->id)->with(['vacancy.jobOrder.country', 'vacancy.jobOrder.company', 'currentStage'])->latest('id')->first();
         $partner = $application?->vacancy?->jobOrder?->company_id;
-        abort_if($partner && (config('care.partner_flags.'.$partner) === false), 404);
+        $journeyEnabled = ! $partner || config('care.partner_flags.'.$partner) !== false;
         $this->sync($candidate);
         $template = $this->template($application);
         $stages = json_decode($template->stages, true);
         $events = $this->ledger($user, $candidate);
         $canIssues = $this->allowed($user, $candidate, 'incident.read');
-        $issues = $canIssues ? DB::table('care_issues')->where('candidate_id', $candidate->id)->orderByDesc('id')->get()->map(function (object $row): object {
-            $row->data = $this->decode($row->details);
+        $canHealth = $this->allowed($user, $candidate, 'health.prescreen.read') || $this->allowed($user, $candidate, 'health.mcu.summary.read');
+        $issues = $canIssues ? DB::table('care_issues')->where('candidate_id', $candidate->id)->where(fn ($q) => $q->whereNull('application_id')->orWhereIn('application_id', app(AccessPolicy::class)->applicationIds($user, 'incident.read')))->orderByDesc('id')->get()->map(function (object $row) use ($canHealth): object {
+            $row->data = $row->category === 'HEALTH' && ! $canHealth ? ['description' => 'Rincian kesehatan terbatas sesuai izin akses.'] : $this->decode($row->details);
             $row->escalations = DB::table('care_escalations')->where('issue_id', $row->id)->get();
 
             return $row;
@@ -453,10 +488,10 @@ class CareJourney
         $requestableIssues = DB::table('care_issues')->where('candidate_id', $candidate->id)->where('category', 'HEALTH')->whereNotIn('status', ['RESOLVED', 'CLOSED'])->when(! $canIssues, fn ($q) => $q->where('opened_by', $user->id))->get(['id', 'severity']);
         $risk = $this->risk($user, $candidate, $events, $issues, $application);
         $partnerQuality = $this->partnerQuality($user, $candidate, $partner);
-        $routes = $this->routes($user, $candidate);
+        $routes = $journeyEnabled ? $this->routes($user, $candidate) : collect();
         $automaticRatio = $events->isEmpty() ? 0 : (int) round($events->where('auto_generated', true)->count() / $events->count() * 100);
         app(AccessPolicy::class)->audit($user, 'care.sensitive_view', ['candidate_id' => $candidate->id, 'incidents_visible' => $canIssues]);
 
-        return compact('candidate', 'application', 'template', 'stages', 'events', 'issues', 'supports', 'risk', 'partnerQuality', 'routes', 'automaticRatio', 'requestableIssues');
+        return compact('candidate', 'application', 'template', 'stages', 'events', 'issues', 'supports', 'risk', 'partnerQuality', 'routes', 'automaticRatio', 'requestableIssues', 'journeyEnabled');
     }
 }

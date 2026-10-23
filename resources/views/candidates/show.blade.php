@@ -8,12 +8,12 @@
     $contact = $candidate->contacts->sortByDesc('is_primary')->sortByDesc('is_emergency')->first();
     $wa = $canCommunicate ? \App\Services\CandidateWorkspace::whatsapp($person?->whatsapp) : null;
 @endphp
-<div class="cpmi-root cpmi-dashboard">
+<div class="cpmi-root cpmi-dashboard" @if(request()->routeIs('candidates.print')) data-cpmi-auto-print @endif>
     <p class="cd-breadcrumb"><a href="{{ route('candidates.index') }}">CRM / Calon Pekerja</a> / Detail</p>
     <div class="cd-page-heading"><h1>Detail Calon Pekerja</h1><div class="cd-actions">
         @if($canEdit)<a class="cd-button primary" href="{{ $editUrl }}">Edit Profil</a><button class="cd-button" type="button" data-cpmi-dialog="cpmi-invite">Kirim Undangan</button>@endif
         @if($canClose)<button class="cd-button danger" type="button" data-cpmi-dialog="cpmi-archive">Arsipkan</button>@endif
-        @if($canPrint)<button class="cd-button" type="button" data-cpmi-print><x-ui-icon name="file"/> Cetak PDF</button>@endif
+        @if($canPrint)<a class="cd-button" href="{{ route('candidates.print',$candidate) }}" target="_blank" rel="noopener"><x-ui-icon name="file"/> Cetak PDF</a>@endif
         <details class="cpmi-menu"><summary aria-label="Aksi lain calon pekerja">•••</summary><nav aria-label="Aksi calon pekerja"><button type="button" data-copy-cpmi="{{ $candidate->candidate_code }}">Salin ID CPMI</button>@if($current)<a href="{{ route('applications.show',$current) }}">Buka lamaran aktif</a>@endif @if($leadRows->first())<a href="{{ route('crm.profile',$leadRows->first()->id) }}">Buka CRM lead asal</a>@endif<a href="#cpmi-detail" data-cpmi-tab-link="detail">Detail & akses portal</a>@if($permissions['timeline']&&config('care.enabled'))<a href="{{ route('care.show',$candidate) }}">JM Care Journey & Dukungan</a>@endif</nav></details>
     </div></div>
     <section class="cd-hero" aria-label="Identitas calon pekerja">

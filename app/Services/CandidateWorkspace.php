@@ -6,7 +6,9 @@ use App\Http\Controllers\AcquisitionController;
 use App\Models\Application;
 use App\Models\Candidate;
 use App\Models\Country;
+use App\Models\MedicalEvent;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CandidateWorkspace
@@ -83,7 +85,8 @@ class CandidateWorkspace
         return $dashboard + compact('candidate', 'permissions', 'canEdit', 'canClose', 'applications', 'current', 'leadRows', 'timeline', 'activityCounts', 'healthSummary', 'documentSummary', 'preferences', 'targetCountry', 'portalAccount', 'mobilityTimeline')
             + ['completion' => app(CrmWorkspace::class)->completeness($candidate), 'nextFollowup' => $leadRows->whereNotNull('next_followup_at')->sortBy('next_followup_at')->first()?->next_followup_at];
     }
-    private function dashboard(Request $request, Candidate $candidate, ?Application $current, \Illuminate\Support\Collection $leads, array $permissions, array $preferences, ?string $targetCountry, \Illuminate\Support\Collection $documentSummary): array
+
+    private function dashboard(Request $request, Candidate $candidate, ?Application $current, Collection $leads, array $permissions, array $preferences, ?string $targetCountry, Collection $documentSummary): array
     {
         $policy = app(AccessPolicy::class);
         $canCommunicate = $permissions['contact'] && $this->allowed($request, $candidate, 'crm.conversation.reply');
@@ -97,7 +100,7 @@ class CandidateWorkspace
         $documentDashboard = $current ? $documentSummary->first(fn (array $row): bool => $row['application']->id === $current->id) : null;
         $documentRows = $documentDashboard ? app(DocumentRequirementEngine::class)->rows($current)->take(8) : collect();
         $canMedical = $current && $policy->applicationIds($request->user(), 'health.mcu.summary.read')->where('applications.id', $current->id)->exists();
-        $medical = $canMedical ? \App\Models\MedicalEvent::where('application_id', $current->id)->where('status', 'completed')->orderByDesc('completed_at')->orderByDesc('id')->first() : null;
+        $medical = $canMedical ? MedicalEvent::where('application_id', $current->id)->where('status', 'completed')->orderByDesc('completed_at')->orderByDesc('id')->first() : null;
         $canSchedule = $current && $policy->applicationIds($request->user(), 'schedule.read')->where('applications.id', $current->id)->exists();
         $interview = $canSchedule ? $current->interviews()->orderByDesc('scheduled_at')->orderByDesc('id')->first() : null;
         $factors = [
@@ -151,5 +154,4 @@ class CandidateWorkspace
 
         return preg_match('/^[1-9][0-9]{7,14}$/', $digits) ? 'https://wa.me/'.$digits : null;
     }
-
 }

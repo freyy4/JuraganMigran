@@ -327,6 +327,9 @@ class AccessPolicy
             };
         }
         if ($prefix === 'candidates') {
+            if ($action === 'print') {
+                return 'report.export';
+            }
             if (in_array($action, ['create-application', 'store-application'], true)) {
                 return 'candidate.assign';
             }

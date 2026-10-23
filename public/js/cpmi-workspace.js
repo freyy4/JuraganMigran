@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.cp
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.querySelector('.cpmi-dashboard');
     if (!root) return;
+    if (root.hasAttribute('data-cpmi-auto-print')) window.addEventListener('load', () => window.print(), {once: true});
     const tabs = [...root.querySelectorAll('[data-cpmi-tab]')];
     const panels = [...root.querySelectorAll('[data-cpmi-pane]')];
     const summary = root.querySelector('#cpmi-summary');

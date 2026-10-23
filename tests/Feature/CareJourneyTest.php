@@ -4,11 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\Application;
 use App\Models\Candidate;
+use App\Models\CandidateDocument;
+use App\Models\Company;
+use App\Models\DocumentType;
 use App\Models\MedicalEvent;
+use App\Models\RequirementDefinition;
 use App\Models\User;
+use App\Models\Vacancy;
 use App\Services\CareJourney;
+use App\Services\DocumentRequirementEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -123,22 +130,23 @@ class CareJourneyTest extends TestCase
         $this->post(route('care.issue', $candidate), ['request_key' => (string) Str::uuid(), 'category' => 'HEALTH', 'severity' => 'S4', 'description' => 'Outside scope'])->assertNotFound();
         $this->assertDatabaseCount('care_issues', 0);
     }
+
     public function test_consent_marital_rules_and_teto_inspection_feed_existing_document_and_mcu_gates(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('documents');
+        Storage::fake('documents');
         $this->actingAs(User::factory()->create());
         $application = Application::factory()->create();
         $application->candidate->person->update(['marital_status' => 'married']);
-        $consent = \App\Models\DocumentType::factory()->create(['name' => 'Izin Keluarga']);
-        $marriage = \App\Models\DocumentType::factory()->create(['name' => 'Buku Nikah']);
+        $consent = DocumentType::factory()->create(['name' => 'Izin Keluarga']);
+        $marriage = DocumentType::factory()->create(['name' => 'Buku Nikah']);
         DB::table('care_journey_templates')->where('country_code', 'DEFAULT')->update(['policy' => json_encode(['consent_required' => true, 'consent_document_type_id' => $consent->id, 'marital_documents' => ['married' => $marriage->id], 'teto_document_type_ids' => [$consent->id]])]);
-        $engine = app(\App\Services\DocumentRequirementEngine::class);
+        $engine = app(DocumentRequirementEngine::class);
         $this->assertCount(2, $engine->requirements($application));
-        $clinic = \App\Models\Company::factory()->create(['type' => 'clinic', 'status' => 'active']);
+        $clinic = Company::factory()->create(['type' => 'clinic', 'status' => 'active']);
         $data = ['application_id' => $application->id, 'clinic_id' => $clinic->id, 'scheduled_at' => '2027-01-20T09:00', 'status' => 'scheduled'];
         $this->post(route('medical-events.store'), $data)->assertSessionHasErrors('application_id');
-        \Illuminate\Support\Facades\Storage::disk('documents')->put('consent.pdf', 'Synthetic consent');
-        $document = \App\Models\CandidateDocument::create(['candidate_id' => $application->candidate_id, 'application_id' => $application->id, 'document_type_id' => $consent->id, 'file_path' => 'consent.pdf', 'version' => 1, 'status' => 'verified']);
+        Storage::disk('documents')->put('consent.pdf', 'Synthetic consent');
+        $document = CandidateDocument::create(['candidate_id' => $application->candidate_id, 'application_id' => $application->id, 'document_type_id' => $consent->id, 'file_path' => 'consent.pdf', 'version' => 1, 'status' => 'verified']);
         $this->assertSame(0, $engine->summary($application)['verified']);
         $checks = array_fill_keys(['readable', 'qr_visible', 'qr_inspected', 'identity_readable', 'profile_reconciled'], 1);
         $this->post(route('care.document-checks', [$application->candidate, $document]), ['version' => 0, 'checks' => $checks])->assertRedirect()->assertSessionHasNoErrors();
@@ -160,7 +168,7 @@ class CareJourneyTest extends TestCase
         $this->assertDatabaseHas('care_issues', ['candidate_id' => $application->candidate_id, 'severity' => 'S4', 'status' => 'OPEN']);
         $this->assertDatabaseCount('care_issues', 1);
         $this->assertDatabaseCount('care_escalations', 2);
-        $this->get(route('care.show', $application->candidate_id))->assertForbidden();
+        $this->get(route('care.show', $application->candidate_id))->assertNotFound();
     }
 
     public function test_route_fit_uses_real_dob_and_requirements_and_records_human_override(): void
@@ -168,15 +176,34 @@ class CareJourneyTest extends TestCase
         $this->actingAs(User::factory()->create());
         $candidate = Candidate::factory()->create();
         $candidate->person->update(['birth_date' => now()->subYears(22)->toDateString(), 'height_cm' => 160]);
-        $vacancy = \App\Models\Vacancy::factory()->create(['status' => 'active']);
-        $age = \App\Models\RequirementDefinition::factory()->create(['code' => 'age_years', 'name' => 'Usia', 'category' => 'basic', 'data_type' => 'integer']);
-        $height = \App\Models\RequirementDefinition::factory()->create(['code' => 'height_cm', 'name' => 'Tinggi badan', 'category' => 'basic', 'data_type' => 'number']);
+        $vacancy = Vacancy::factory()->create(['status' => 'active']);
+        $age = RequirementDefinition::factory()->create(['code' => 'age_years', 'name' => 'Usia', 'category' => 'basic', 'data_type' => 'integer']);
+        $height = RequirementDefinition::factory()->create(['code' => 'height_cm', 'name' => 'Tinggi badan', 'category' => 'basic', 'data_type' => 'number']);
         $vacancy->requirements()->create(['requirement_definition_id' => $age->id, 'operator' => 'between', 'value_min' => 20, 'value_max' => 30, 'is_required' => true]);
         $vacancy->requirements()->create(['requirement_definition_id' => $height->id, 'operator' => 'gte', 'value_min' => 155, 'is_required' => true]);
         $this->get(route('care.show', $candidate))->assertOk()->assertViewHas('routes', fn ($rows) => $rows->first()['match'] === 'MATCH' && $rows->first()['score'] === 100);
         $this->post(route('care.decision', $candidate), ['request_key' => (string) Str::uuid(), 'vacancy_id' => $vacancy->id, 'decision' => 'OVERRIDE', 'reason' => 'CPMI memilih negara lain setelah penjelasan'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('care_events', ['candidate_id' => $candidate->id, 'event_type' => 'route_decision']);
         $this->assertDatabaseCount('applications', 0);
+    }
+    public function test_readonly_timeline_never_exposes_case_notes_or_other_users_support(): void
+    {
+        $owner = User::factory()->create();
+        $this->actingAs($owner);
+        $application = Application::factory()->create();
+        $service = app(CareJourney::class);
+        $service->openIssue($owner, $application->candidate, ['request_key' => (string) Str::uuid(), 'category' => 'HEALTH', 'severity' => 'S3', 'description' => 'RAHASIA-INSIDEN-KESEHATAN']);
+        $role = DB::table('crm_roles')->insertGetId(['code' => 'care_reader', 'name' => 'Timeline only', 'scope_type' => 'OPERATIONAL_ALL', 'permissions' => json_encode(['candidate.read.basic', 'candidate.read.timeline']), 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $reader = User::factory()->create(['crm_role_id' => $role]);
+        $this->actingAs($reader)->get(route('care.show', $application->candidate))->assertOk()->assertDontSee('RAHASIA-INSIDEN-KESEHATAN')->assertViewHas('issues', fn ($rows) => $rows->isEmpty());
+    }
+
+    public function test_print_is_permission_checked_and_audited(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $candidate = Candidate::factory()->create();
+        $this->get(route('candidates.print', $candidate))->assertOk()->assertSee('data-cpmi-auto-print', false);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'candidate.print']);
     }
 
 }

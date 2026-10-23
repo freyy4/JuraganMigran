@@ -7,6 +7,7 @@ return [
     'post_mcu_lpk_days' => 7,
     'silent_days' => 7,
     'minimum_partner_sample' => 10,
+    'partner_quality_weights' => ['substantiated' => 70, 'response_sla' => 30],
     'sla_minutes' => ['S1' => [1440, 2880], 'S2' => [60, 180], 'S3' => [15, 30], 'S4' => [0, 0]],
     'escalation_roles' => [1 => ['supervisor', 'compliance'], 2 => ['super_admin', 'migration_owner']],
     'emergency_approver_roles' => ['super_admin', 'migration_owner'],

@@ -41,6 +41,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach ([Candidate::class, Application::class, CandidateDocument::class, MedicalEvent::class, TrainingEnrollment::class, Interview::class, HealthInterview::class, ApplicationStageHistory::class, FlightDetail::class] as $journeyModel) {
+            $journeyModel::saved(function (Model $record): void {
+                if (! config('care.enabled') || ! Schema::hasTable('care_events')) {
+                    return;
+                }
+                $candidateId = $record instanceof Candidate ? $record->id : ($record->candidate_id ?? DB::table('applications')->where('id', $record->application_id)->value('candidate_id'));
+                $candidate = Candidate::withoutGlobalScopes()->find($candidateId);
+                if ($candidate) {
+                    app(\App\Services\CareJourney::class)->sync($candidate);
+                }
+            });
+        }
         foreach ([Vacancy::class => ['posisi-pekerjaan', 'position_name'], Task::class => ['jenis-tugas', 'task_type'], ApplicationBlocker::class => ['kategori-kendala', 'category']] as $model => [$resource, $field]) {
             $model::saving(function (Model $record) use ($resource, $field): void {
                 $value = $record->{$field};

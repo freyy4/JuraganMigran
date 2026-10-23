@@ -106,6 +106,14 @@ class CandidateController extends Controller
         return view('candidates.show', app(CandidateWorkspace::class)->details($request, $candidate));
     }
 
+    public function print(Request $request, Candidate $candidate): View
+    {
+        abort_unless(app(AccessPolicy::class)->canCandidate($request->user(), $candidate->id, 'report.export'), 403);
+        app(AccessPolicy::class)->audit($request->user(), 'candidate.print', ['candidate_id' => $candidate->id]);
+
+        return view('candidates.show', app(CandidateWorkspace::class)->details($request, $candidate));
+    }
+
     public function archive(Request $request, Candidate $candidate): RedirectResponse
     {
         $data = $request->validate(['reason' => 'required|string|max:500', 'confirm' => 'accepted']);

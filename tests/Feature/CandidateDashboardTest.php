@@ -63,6 +63,13 @@ class CandidateDashboardTest extends TestCase
             }
             file_put_contents($directory.'/detail.html', $response->getContent());
             file_put_contents($directory.'/registry.html', $this->get(route('candidates.index'))->getContent());
+            if ($careDirectory = getenv('CARE_QA_FIXTURES')) {
+                if (! is_dir($careDirectory)) {
+                    mkdir($careDirectory, 0777, true);
+                }
+                file_put_contents($careDirectory.'/care.html', $this->get(route('care.show', $candidate))->assertOk()->getContent());
+            }
+
         }
     }
 

@@ -6,10 +6,14 @@ use App\Http\Requests\SaveMedicalEventRequest;
 use App\Models\Application;
 use App\Models\Company;
 use App\Models\MedicalEvent;
+use App\Services\CareJourney;
+use App\Services\DocumentRequirementEngine;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class MedicalEventController extends Controller
@@ -58,15 +62,15 @@ class MedicalEventController extends Controller
             $data['expires_at'] = null;
         }
 
-        if (config('care.enabled') && \Illuminate\Support\Facades\Schema::hasColumn('care_journey_templates', 'policy')) {
+        if (config('care.enabled') && Schema::hasColumn('care_journey_templates', 'policy')) {
             $application = Application::whereKey($data['application_id'])->firstOrFail();
-            $policy = json_decode(app(\App\Services\CareJourney::class)->template($application)->policy ?? '{}', true);
+            $policy = json_decode(app(CareJourney::class)->template($application)->policy ?? '{}', true);
             if ($policy['consent_required'] ?? false) {
                 $typeId = $policy['consent_document_type_id'] ?? null;
-                $documents = app(\App\Services\DocumentRequirementEngine::class)->rows($application);
+                $documents = app(DocumentRequirementEngine::class)->rows($application);
                 $consent = $documents->first(fn (array $row): bool => (int) $row['rule']->document_type_id === (int) $typeId);
                 if (! $typeId || ! $consent || ! $consent['verified']) {
-                    throw \Illuminate\Validation\ValidationException::withMessages(['application_id' => 'Izin keluarga terverifikasi wajib sebelum MCU untuk program ini.']);
+                    throw ValidationException::withMessages(['application_id' => 'Izin keluarga terverifikasi wajib sebelum MCU untuk program ini.']);
                 }
             }
         }

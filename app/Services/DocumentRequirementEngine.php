@@ -9,6 +9,7 @@ use App\Models\PipelineStage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -34,16 +35,16 @@ class DocumentRequirementEngine
                 return $row;
             });
         } else {
-        $requirements = $application->vacancy->documentRequirements()->with('documentType')->where('is_active', true)->orderBy('sort_order')->get()->map(function ($row): object {
-            $row->source_key = (string) $row->id;
-            $row->required_level = $row->condition_rule ? 'CONDITIONAL' : ($row->is_required ? 'REQUIRED' : 'OPTIONAL');
-            $row->expiry_policy = 'VALID';
+            $requirements = $application->vacancy->documentRequirements()->with('documentType')->where('is_active', true)->orderBy('sort_order')->get()->map(function ($row): object {
+                $row->source_key = (string) $row->id;
+                $row->required_level = $row->condition_rule ? 'CONDITIONAL' : ($row->is_required ? 'REQUIRED' : 'OPTIONAL');
+                $row->expiry_policy = 'VALID';
 
-            return $row;
-        });
+                return $row;
+            });
         }
 
-        if (config('care.enabled') && \Illuminate\Support\Facades\Schema::hasColumn('care_journey_templates', 'policy')) {
+        if (config('care.enabled') && Schema::hasColumn('care_journey_templates', 'policy')) {
             $policy = json_decode(app(CareJourney::class)->template($application)->policy ?? '{}', true);
             $ids = collect();
             if ($policy['consent_required'] ?? false) {
@@ -104,7 +105,7 @@ class DocumentRequirementEngine
             }
             $valid = $document && $document->file_path && Storage::disk('documents')->exists($document->file_path) && ! in_array($status, ['needs_correction', 'rejected', 'expired'], true) && ! $minimumInvalid;
             $verified = $valid && $document->status === 'verified';
-            if ($verified && config('care.enabled') && \Illuminate\Support\Facades\Schema::hasTable('care_document_checks')) {
+            if ($verified && config('care.enabled') && Schema::hasTable('care_document_checks')) {
                 $policy = json_decode(app(CareJourney::class)->template($application)->policy ?? '{}', true);
                 if (in_array((int) $rule->document_type_id, $policy['teto_document_type_ids'] ?? [], true)) {
                     $check = DB::table('care_document_checks')->where('candidate_document_id', $document->id)->first();

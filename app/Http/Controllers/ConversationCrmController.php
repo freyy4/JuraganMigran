@@ -378,7 +378,7 @@ class ConversationCrmController extends Controller
             $row = DB::table('crm_follow_ups')->where('id', $followup)->where('lead_id', $lead)->where('status', 'SCHEDULED')->first() ?? abort(404);
             if ($data['status'] === 'RESCHEDULED') {
                 if (! Carbon::parse($data['expected_due_at'])->equalTo(Carbon::parse($row->due_at))) {
-                    throw \Illuminate\Validation\ValidationException::withMessages(['due_at' => 'Jadwal telah berubah. Muat ulang sebelum menyimpan.']);
+                    throw ValidationException::withMessages(['due_at' => 'Jadwal telah berubah. Muat ulang sebelum menyimpan.']);
                 }
                 $due = Carbon::parse($data['due_at'], 'Asia/Jakarta')->utc();
                 DB::table('crm_follow_ups')->where('id', $row->id)->update(['due_at' => $due, 'updated_at' => now()]);

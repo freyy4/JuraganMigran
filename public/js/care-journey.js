@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     root.querySelector('[data-care-need-search]')?.addEventListener('input', event => root.querySelectorAll('[data-care-need]').forEach(need => need.hidden = !need.textContent.toLocaleLowerCase().includes(event.target.value.toLocaleLowerCase())));
     root.querySelectorAll('[data-care-view]').forEach(button => button.addEventListener('click', () => {
         const board = button.dataset.careView === 'board';
+        if (!root.querySelector('[data-care-board]')) return;
         root.querySelector('[data-care-board]').hidden = !board;
         root.querySelector('[data-care-ledger]').hidden = board;
         root.querySelector('[data-care-ledger]').classList.toggle('is-list', button.dataset.careView === 'list');

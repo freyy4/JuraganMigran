@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Candidate;
+use App\Models\CandidateDocument;
 use App\Services\AccessPolicy;
 use App\Services\CareJourney;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -113,7 +113,7 @@ class CareJourneyController extends Controller
         return back()->with('success', 'Template journey diperbarui.');
     }
 
-    public function documentChecks(Request $request, Candidate $candidate, \App\Models\CandidateDocument $document): RedirectResponse
+    public function documentChecks(Request $request, Candidate $candidate, CandidateDocument $document): RedirectResponse
     {
         $this->care->authorize($request->user(), $candidate, 'document.verify');
         abort_unless($document->candidate_id === $candidate->id, 404);
@@ -122,7 +122,7 @@ class CareJourneyController extends Controller
         }
         $data = $request->validate(['version' => 'required|integer|min:0', 'checks' => 'required|array:readable,qr_visible,qr_inspected,identity_readable,profile_reconciled', 'checks.readable' => 'required|boolean', 'checks.qr_visible' => 'required|boolean', 'checks.qr_inspected' => 'required|boolean', 'checks.identity_readable' => 'required|boolean', 'checks.profile_reconciled' => 'required|boolean']);
         DB::transaction(function () use ($request, $candidate, $document, $data): void {
-            \App\Models\CandidateDocument::whereKey($document->id)->lockForUpdate()->firstOrFail();
+            CandidateDocument::whereKey($document->id)->lockForUpdate()->firstOrFail();
             $row = DB::table('care_document_checks')->where('candidate_document_id', $document->id)->first();
             abort_unless(($row->version ?? 0) === $data['version'], 409, 'Pemeriksaan telah berubah. Muat ulang.');
             DB::table('care_document_checks')->updateOrInsert(['candidate_document_id' => $document->id], ['checked_by' => $request->user()->id, 'checks' => json_encode($data['checks']), 'version' => $data['version'] + 1, 'created_at' => $row->created_at ?? now(), 'updated_at' => now()]);

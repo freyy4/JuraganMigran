@@ -8,6 +8,7 @@ use App\Http\Controllers\AuthenticationSecurityController;
 use App\Http\Controllers\BlockerController;
 use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\CandidateController;
+use App\Http\Controllers\CareJourneyController;
 use App\Http\Controllers\CockpitController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ConversationCrmController;
@@ -376,6 +377,7 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
+    Route::get('calon-pekerja/{candidate}/cetak', [CandidateController::class, 'print'])->name('candidates.print');
     Route::post('calon-pekerja/{candidate}/archive', [CandidateController::class, 'archive'])->name('candidates.archive');
     Route::resource('calon-pekerja', CandidateController::class)->parameters(['calon-pekerja' => 'candidate'])->names('candidates');
 
@@ -500,17 +502,17 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     Route::post('data-master/{master}', [MasterDataController::class, 'store'])->name('master-data.store');
     Route::get('data-master/{master}/{record}/edit', [MasterDataController::class, 'edit'])->whereNumber('record')->name('master-data.edit');
     Route::put('data-master/{master}/{record}', [MasterDataController::class, 'update'])->whereNumber('record')->name('master-data.update');
-    Route::get('jm-care', [\App\Http\Controllers\CareJourneyController::class, 'index'])->name('care.index');
-    Route::get('jm-care/cpmi/{candidate}', [\App\Http\Controllers\CareJourneyController::class, 'show'])->name('care.show');
+    Route::get('jm-care', [CareJourneyController::class, 'index'])->name('care.index');
+    Route::get('jm-care/cpmi/{candidate}', [CareJourneyController::class, 'show'])->name('care.show');
     foreach (['touchpoint', 'issue', 'support', 'decision'] as $careAction) {
-        Route::post('jm-care/cpmi/{candidate}/'.$careAction, [\App\Http\Controllers\CareJourneyController::class, $careAction])->name('care.'.$careAction);
+        Route::post('jm-care/cpmi/{candidate}/'.$careAction, [CareJourneyController::class, $careAction])->name('care.'.$careAction);
     }
-    Route::post('jm-care/cpmi/{candidate}/issues/{issue}/status', [\App\Http\Controllers\CareJourneyController::class, 'issueStatus'])->whereNumber('issue')->name('care.issue-status');
-    Route::post('jm-care/cpmi/{candidate}/issues/{issue}/verify', [\App\Http\Controllers\CareJourneyController::class, 'verify'])->whereNumber('issue')->name('care.verify');
-    Route::post('jm-care/cpmi/{candidate}/supports/{support}/status', [\App\Http\Controllers\CareJourneyController::class, 'supportStatus'])->whereNumber('support')->name('care.support-status');
-    Route::post('jm-care/cpmi/{candidate}/exit-review', [\App\Http\Controllers\CareJourneyController::class, 'exitReview'])->name('care.exit-review');
-    Route::post('jm-care/cpmi/{candidate}/documents/{document}/checks', [\App\Http\Controllers\CareJourneyController::class, 'documentChecks'])->name('care.document-checks');
-    Route::post('jm-care/templates/{country}', [\App\Http\Controllers\CareJourneyController::class, 'template'])->name('care.template');
+    Route::post('jm-care/cpmi/{candidate}/issues/{issue}/status', [CareJourneyController::class, 'issueStatus'])->whereNumber('issue')->name('care.issue-status');
+    Route::post('jm-care/cpmi/{candidate}/issues/{issue}/verify', [CareJourneyController::class, 'verify'])->whereNumber('issue')->name('care.verify');
+    Route::post('jm-care/cpmi/{candidate}/supports/{support}/status', [CareJourneyController::class, 'supportStatus'])->whereNumber('support')->name('care.support-status');
+    Route::post('jm-care/cpmi/{candidate}/exit-review', [CareJourneyController::class, 'exitReview'])->name('care.exit-review');
+    Route::post('jm-care/cpmi/{candidate}/documents/{document}/checks', [CareJourneyController::class, 'documentChecks'])->name('care.document-checks');
+    Route::post('jm-care/templates/{country}', [CareJourneyController::class, 'template'])->name('care.template');
 
     Route::get('tindak-lanjut', [FollowUpWorkspaceController::class, 'index'])->name('follow-ups.index');
     Route::get('api/crm/follow-ups', [FollowUpWorkspaceController::class, 'index'])->name('follow-ups.api-index');
@@ -532,7 +534,7 @@ Route::get('portal/invitation/{token}', [PortalController::class, 'invitation'])
 Route::post('portal/invitation/{token}', [PortalController::class, 'activate'])->middleware('throttle:5,1')->block(10, 10)->name('portal.activate');
 Route::middleware(PortalAccess::class)->group(function (): void {
     Route::get('portal', [PortalController::class, 'page'])->name('portal.home');
-    Route::match(['get', 'post'], 'portal/kabar', [\App\Http\Controllers\CareJourneyController::class, 'portalWelfare'])->middleware('throttle:10,1')->name('portal.welfare');
+    Route::match(['get', 'post'], 'portal/kabar', [CareJourneyController::class, 'portalWelfare'])->middleware('throttle:10,1')->name('portal.welfare');
     foreach (['process', 'documents', 'schedules', 'requests', 'help', 'profile', 'privacy', 'notifications'] as $page) {
         Route::get('portal/'.$page, [PortalController::class, 'page'])->defaults('page', $page)->name('portal.'.$page);
     }
