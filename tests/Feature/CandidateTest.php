@@ -77,4 +77,31 @@ class CandidateTest extends TestCase
         $this->post(route('candidates.store'), $data)->assertSessionHasErrors(['person.birth_date', 'person.nik', 'person.whatsapp']);
         $this->assertDatabaseCount('candidates', 1);
     }
+
+    public function test_autosave_persists_canonical_profile_and_rejects_stale_version(): void
+    {
+        $this->post(route('candidates.store'), $this->payload())->assertSessionHasNoErrors();
+        $candidate = Candidate::firstOrFail();
+        $data = $this->payload();
+        $data['profile_version'] = $candidate->updated_at->toISOString();
+        $data['person']['height_cm'] = 162;
+        $response = $this->putJson(route('candidates.update', $candidate), $data)->assertOk()->assertJsonPath('saved', true);
+        $this->assertDatabaseHas('persons', ['id' => $candidate->person_id, 'height_cm' => 162]);
+        $this->putJson(route('candidates.update', $candidate), $data)->assertStatus(409);
+        $data['profile_version'] = $response->json('version');
+        $this->putJson(route('candidates.update', $candidate), $data)->assertOk();
+        $this->assertDatabaseCount('candidates', 1);
+    }
+
+    public function test_duplicate_phone_is_rejected_across_normalized_contact_fields(): void
+    {
+        $this->post(route('candidates.store'), $this->payload())->assertSessionHasNoErrors();
+        $data = $this->payload();
+        $data['candidate_code'] = 'CPMI-SECOND';
+        $data['person']['nik'] = '9999999999999999';
+        $data['person']['phone'] = '+62 812-3456-7890';
+        unset($data['person']['whatsapp']);
+        $this->postJson(route('candidates.store'), $data)->assertUnprocessable()->assertJsonValidationErrors('person.phone');
+        $this->assertDatabaseCount('candidates', 1);
+    }
 }

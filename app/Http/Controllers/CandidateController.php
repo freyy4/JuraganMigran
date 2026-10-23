@@ -86,7 +86,7 @@ class CandidateController extends Controller
         return view('candidates.form', ['candidate' => new Candidate(['candidate_code' => 'CPMI-'.Str::ulid(), 'status' => 'lead', 'registered_at' => now()]), 'statuses' => Candidate::statusOptions(), 'profileApplication' => null, 'countries' => Country::orderBy('name')->get(['id', 'name'])]);
     }
 
-    public function store(SaveCandidateRequest $request): RedirectResponse
+    public function store(SaveCandidateRequest $request): RedirectResponse|JsonResponse
     {
         $data = $request->validated();
         $data['registered_at'] = Carbon::parse($data['registered_at'], 'Asia/Jakarta')->utc();
@@ -97,6 +97,10 @@ class CandidateController extends Controller
 
             return $candidate;
         });
+
+        if ($request->expectsJson()) {
+            return response()->json(['saved' => true, 'version' => $candidate->updated_at->toISOString(), 'update_url' => route('candidates.update', $candidate), 'id' => $candidate->id]);
+        }
 
         return to_route('candidates.show', $candidate)->with('success', 'Calon pekerja berhasil ditambahkan.');
     }

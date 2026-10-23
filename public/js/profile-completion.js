@@ -2,7 +2,7 @@
  const form = document.getElementById('completion-form'); if (!form) return;
  const labels = ['Data Dasar','Screening Awal','Dokumen','Preferensi Kerja','Keluarga & Izin','Kesiapan Berangkat'];
  const stateKey = `cpmi-step-${form.dataset.key}`;
- let step = Number(sessionStorage.getItem(stateKey) || 0), timer, dirty = false, saving = false, queued = false;
+ let step = Number(sessionStorage.getItem(stateKey) || 0), timer, dirty = false, saving = false, queued = false, revision = 0;
  const status = document.getElementById('autosave-status');
  const value = name => form.elements.namedItem(name)?.value || '';
  const text = (parent, message, cls = '') => { const p = document.createElement('p'); p.className = cls; p.textContent = message; parent.append(p); };
@@ -24,21 +24,20 @@
  }
  function clearErrors(){form.querySelectorAll('.autosave-error').forEach(e=>e.remove());}
  async function save() {
-  if(saving){queued=true;return false;} if(!form.reportValidity()){status.textContent='Lengkapi kolom wajib sebelum menyimpan.';return false;}
-  if(form.dataset.existing!=='1'){form.requestSubmit();return false;}
-  saving=true; status.textContent='Menyimpan…'; const snapshot=new FormData(form); snapshot.delete('age_display'); clearErrors();
-  try { const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'},body:snapshot});const data=await response.json();if(!response.ok){for(const [key,messages] of Object.entries(data.errors||{})){const name=key.replace(/\.([^.]*)/g,'[$1]'); const input=form.elements.namedItem(name);const error=document.createElement('small');error.className='autosave-error field-error';error.textContent=messages[0];(input?.parentElement||status.parentElement).append(error);} throw new Error(response.status===409?'Profil diubah staf lain. Muat ulang sebelum menyimpan.':data.message||'Gagal menyimpan.');} form.elements.namedItem('profile_version').value=data.version; dirty=queued;status.textContent='✓ Tersimpan'; return true;
+  if(saving){queued=true;return false;} const invalid = Array.from(form.elements).find(el => el.willValidate && !el.validity.valid); if(invalid){const panel=invalid.closest('[data-step-panel]');if(panel)navigate(Number(panel.dataset.stepPanel));} if(!form.reportValidity()){status.textContent='Lengkapi kolom wajib sebelum menyimpan.';return false;}
+  const savedRevision = revision; saving=true; status.textContent='Menyimpan…'; const snapshot=new FormData(form); snapshot.delete('age_display'); clearErrors();
+  try { const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'},body:snapshot});const data=await response.json();if(!response.ok){for(const [key,messages] of Object.entries(data.errors||{})){const name=key.replace(/\.([^.]*)/g,'[$1]'); const input=form.elements.namedItem(name);const error=document.createElement('small');error.className='autosave-error field-error';error.textContent=messages[0];(input?.parentElement||status.parentElement).append(error);} throw new Error(response.status===409?'Profil diubah staf lain. Muat ulang sebelum menyimpan.':data.message||'Gagal menyimpan.');} if(data.update_url){form.action=data.update_url;form.dataset.existing='1';let method=form.elements.namedItem('_method');if(!method){method=document.createElement('input');method.type='hidden';method.name='_method';form.append(method);}method.value='PUT';} form.elements.namedItem('profile_version').value=data.version; dirty=queued || revision !== savedRevision;status.textContent='✓ Tersimpan'; return true;
   }catch(error){status.textContent=`Gagal menyimpan: ${error.message} Klik Simpan Draft untuk mencoba lagi.`;return false;}finally{saving=false;if(queued){queued=false;save();}}
  }
- form.addEventListener('input',()=>{dirty=true;insights();clearTimeout(timer);if(form.dataset.existing==='1')timer=setTimeout(save,1100);else status.textContent='Belum tersimpan — klik Simpan Draft.';});
- form.addEventListener('change',()=>{dirty=true;insights();clearTimeout(timer);if(form.dataset.existing==='1')timer=setTimeout(save,1100);});
+ form.addEventListener('input',()=>{dirty=true;revision++;insights();clearTimeout(timer);if(value('person[full_name]').trim())timer=setTimeout(save,1100);});
+ form.addEventListener('change',()=>{dirty=true;revision++;insights();clearTimeout(timer);if(value('person[full_name]').trim())timer=setTimeout(save,1100);});
  document.querySelectorAll('[data-save-draft]').forEach(b=>b.onclick=()=>{clearTimeout(timer);save();});
  document.querySelectorAll('[data-advance]').forEach(b=>b.onclick=async()=>{clearTimeout(timer);if(await save()){if(step===6)location.href=form.action;else navigate(step+1);}});
  form.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>navigate(Number(b.dataset.step)));document.getElementById('previous-step').onclick=()=>navigate(step-1);
  form.addEventListener('keydown',e=>{if(e.key==='Enter' && e.target.tagName==='INPUT')e.preventDefault();if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();save();}});
  const contacts=document.getElementById('contacts');let nextIndex=Math.max(-1,...Array.from(contacts.querySelectorAll('input[name]')).map(i=>Number(i.name.match(/^contacts\[(\d+)\]/)?.[1]??-1)))+1;
- document.getElementById('add-contact').onclick=()=>{contacts.insertAdjacentHTML('beforeend',document.getElementById('contact-template').innerHTML.replaceAll('__INDEX__',String(nextIndex++)));dirty=true;insights();};
- contacts.onclick=e=>{const b=e.target.closest('[data-remove-contact]');if(b){b.closest('[data-contact]').remove();dirty=true;insights();clearTimeout(timer);timer=setTimeout(save,1100);}};
+ document.getElementById('add-contact').onclick=()=>{contacts.insertAdjacentHTML('beforeend',document.getElementById('contact-template').innerHTML.replaceAll('__INDEX__',String(nextIndex++)));dirty=true;revision++;insights();};
+ contacts.onclick=e=>{const b=e.target.closest('[data-remove-contact]');if(b){b.closest('[data-contact]').remove();dirty=true;revision++;insights();clearTimeout(timer);timer=setTimeout(save,1100);}};
  window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});window.addEventListener('offline',()=>status.textContent='Offline — perubahan belum tersimpan.');window.addEventListener('online',()=>{if(dirty)save();});form.addEventListener('submit',()=>dirty=false);
  navigate(step);insights();
 })();
