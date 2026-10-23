@@ -33,7 +33,7 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
         await send('Page.enable');
         const navigate=async page=>{const previous=await evaluate('performance.timeOrigin');await send('Page.navigate',{url:origin+'/'+page});for(let i=0;i<100;i++){await delay(50);if(await evaluate(`performance.timeOrigin!==${previous}&&document.readyState==='complete'&&!!document.querySelector('.cpmi-root')`))return;}throw Error('Page failed to load');};
         const click=async selector=>{const point=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});};
-        const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(fixtures,name+'.png'),Buffer.from(data.data,'base64'));};
+        const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(fixtures,name+'.png'),Buffer.from(data.data,'base64'));};
         for(const width of [1536,1366,1024,768,390]){
           await send('Emulation.setDeviceMetricsOverride',{width,height:1024,deviceScaleFactor:1,mobile:width<768});
           await navigate('registry');
@@ -62,6 +62,11 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
           await click('#cpmi-invite [data-cpmi-dialog-close]');
           await click('[data-cpmi-tab="activity"]');
           assert.equal(await evaluate(`document.querySelector('.cd-timeline').hidden`),false);
+          await evaluate(`(()=>{const input=document.querySelector('[data-cpmi-timeline-search]');input.value='TIDAK-ADA-EVENT-INI';input.dispatchEvent(new Event('input'))})()`);
+          assert.equal(await evaluate(`document.querySelector('[data-cpmi-no-events]').hidden`),false);
+          await evaluate(`(()=>{const input=document.querySelector('[data-cpmi-timeline-search]');input.value='';input.dispatchEvent(new Event('input'))})()`);
+          assert.equal(await evaluate(`document.querySelectorAll('.cd-event:not([hidden])').length>0`),true);
+
           await click('[data-cpmi-tab="summary"]');
           assert.equal(await evaluate(`document.querySelector('.cd-data').hidden`),false);
           await click('[data-cpmi-tab="documents"]');

@@ -49,6 +49,11 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
           await click('[data-care-drag="transport"]');
           assert.equal(await evaluate(`document.querySelector('#care-support-dialog [name=type]').value`),'transport');
           await click('#care-support-dialog [data-care-close]');
+          assert.equal(await evaluate(`Array.from(document.querySelectorAll('[draggable=true]')).every(e=>e.hasAttribute('data-care-drag'))`),true);
+          await evaluate(`(()=>{const data=new DataTransfer();const handle=document.querySelector('[data-care-drag="transport"]');handle.dispatchEvent(new DragEvent('dragstart',{dataTransfer:data,bubbles:true}));const stage=document.querySelector('[data-care-stage="mcu"]');stage.dispatchEvent(new DragEvent('dragover',{dataTransfer:data,bubbles:true,cancelable:true}));stage.dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}))})()`);
+          assert.equal(await evaluate(`document.querySelector('#care-support-dialog').open`),true);
+          assert.equal(await evaluate(`document.querySelector('#care-support-dialog [name=stage]').value`),'mcu');
+          await click('#care-support-dialog [data-care-close]');
           await click('[data-care-view="timeline"]');
           assert.equal(await evaluate(`document.querySelector('[data-care-board]').hidden`),true);
           await click('[data-care-view="board"]');

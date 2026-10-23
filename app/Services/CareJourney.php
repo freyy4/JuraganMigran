@@ -107,7 +107,7 @@ class CareJourney
             $row->data = $this->decode($row->payload);
             $expected = hash_hmac('sha256', $row->candidate_id.'|'.$row->source_key.'|'.$row->event_type.'|'.json_encode($row->data, JSON_THROW_ON_ERROR), config('app.key'));
             abort_unless(hash_equals($expected, $row->signature), 409, 'Integritas event perlu ditinjau administrator.');
-            if (($row->event_type === 'welfare_check' || ($row->data['outcome'] ?? null) === 'WELFARE') && ! $this->allowed($user, $candidate, 'health.prescreen.read') && ! $this->allowed($user, $candidate, 'health.mcu.summary.read')) {
+            if ((in_array($row->event_type, ['welfare_check', 'issue_report'], true) || ($row->data['outcome'] ?? null) === 'WELFARE') && ! $this->allowed($user, $candidate, 'health.prescreen.read') && ! $this->allowed($user, $candidate, 'health.mcu.summary.read')) {
                 $row->data = ['title' => 'Welfare check tercatat · rincian kesehatan terbatas'];
             }
 
@@ -165,6 +165,16 @@ class CareJourney
                 abort_unless($related, 422, 'Partner harus terkait dengan perjalanan CPMI.');
             }
             [$ack, $action] = config('care.sla_minutes.'.$data['severity']);
+            $activeHealth = $data['category'] === 'HEALTH' ? DB::table('care_issues')->where('candidate_id', $candidate->id)->where('category', 'HEALTH')->whereNotIn('status', ['RESOLVED', 'CLOSED'])->when($partnerId, fn ($q) => $q->where('partner_id', $partnerId))->latest('id')->lockForUpdate()->first() : null;
+            if ($activeHealth) {
+                if ((int) substr($data['severity'], 1) > (int) substr($activeHealth->severity, 1)) {
+                    DB::table('care_issues')->where('id', $activeHealth->id)->update(['severity' => $data['severity'], 'ack_due_at' => min(Carbon::parse($activeHealth->ack_due_at), now()->addMinutes($ack)), 'action_due_at' => min(Carbon::parse($activeHealth->action_due_at), now()->addMinutes($action)), 'acknowledged_at' => null, 'action_at' => null, 'version' => $activeHealth->version + 1, 'updated_at' => now()]);
+                }
+                $this->event($candidate, 'issue-report:'.$data['request_key'], 'issue_report', ['title' => 'Laporan welfare ditambahkan ke kasus aktif', 'issue_id' => $activeHealth->id, 'severity' => $data['severity'], 'note' => $data['description']], 'incident.read', $user, $activeHealth->application_id);
+                $this->monitorIssue($activeHealth->id);
+
+                return $activeHealth->id;
+            }
             $id = DB::table('care_issues')->insertGetId(['request_key' => $data['request_key'], 'candidate_id' => $candidate->id, 'application_id' => $application?->id, 'partner_id' => $partnerId, 'opened_by' => $user->id, 'owner_id' => $application?->assigned_cs_id, 'category' => $data['category'], 'severity' => $data['severity'], 'status' => 'OPEN', 'verification' => 'REPORTED', 'details' => Crypt::encryptString(json_encode(['description' => $data['description']])), 'version' => 1, 'ack_due_at' => now()->addMinutes($ack), 'action_due_at' => now()->addMinutes($action), 'created_at' => now(), 'updated_at' => now()]);
             $this->event($candidate, 'issue:'.$id.':open', 'issue_opened', ['title' => 'Insiden dibuka', 'issue_id' => $id, 'severity' => $data['severity'], 'category' => $data['category']], 'incident.read', $user, $application?->id);
             $this->monitorIssue($id);

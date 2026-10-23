@@ -54,6 +54,8 @@ class CareJourneyTest extends TestCase
         $payload = ['request_key' => (string) Str::uuid(), 'outcome' => 'WELFARE', 'channel' => 'CALL', 'stage' => 'lpk'];
         $this->post(route('care.touchpoint', $candidate), $payload)->assertSessionHasNoErrors()->assertRedirect();
         $this->post(route('care.touchpoint', $candidate), $payload)->assertSessionHasNoErrors();
+        $payload['request_key'] = (string) Str::uuid();
+        $this->post(route('care.touchpoint', $candidate), $payload)->assertSessionHasNoErrors();
         $this->assertDatabaseCount('care_issues', 1);
         $this->assertDatabaseHas('care_issues', ['category' => 'HEALTH', 'severity' => 'S2', 'status' => 'OPEN']);
         $this->travel(181)->minutes();
