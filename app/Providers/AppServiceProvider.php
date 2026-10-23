@@ -17,6 +17,7 @@ use App\Models\Task;
 use App\Models\TrainingEnrollment;
 use App\Models\Vacancy;
 use App\Services\AccessPolicy;
+use App\Services\CareJourney;
 use App\Services\ProcessWorkflow;
 use App\Services\TrackingHub;
 use Illuminate\Database\Eloquent\Builder;
@@ -49,7 +50,7 @@ class AppServiceProvider extends ServiceProvider
                 $candidateId = $record instanceof Candidate ? $record->id : ($record->candidate_id ?? DB::table('applications')->where('id', $record->application_id)->value('candidate_id'));
                 $candidate = Candidate::withoutGlobalScopes()->find($candidateId);
                 if ($candidate) {
-                    app(\App\Services\CareJourney::class)->sync($candidate);
+                    app(CareJourney::class)->sync($candidate);
                 }
             });
         }

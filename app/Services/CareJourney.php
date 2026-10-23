@@ -59,7 +59,10 @@ class CareJourney
                 $this->event($candidate, 'training:'.$row->id.':'.$row->status, 'training_updated', ['title' => 'Pelatihan: '.$row->status], 'process.read', application: $application->id, automatic: true, stage: 'lpk', occurred: $row->updated_at);
                 if ($row->joined_at && in_array($row->status, ['ongoing', 'on_hold'], true)) {
                     $days = max(0, (int) Carbon::parse($row->joined_at)->diffInDays(now(), false));
-                    $checkDays = array_unique([1, 3, 7, ...range(14, max(14, min(364, $days)), 7)]);
+                    $checkDays = [1, 3, 7];
+                    for ($checkDay = 14; $checkDay <= min(364, $days); $checkDay += 7) {
+                        $checkDays[] = $checkDay;
+                    }
                     foreach ($checkDays as $day) {
                         if ($day <= $days) {
                             $this->event($candidate, 'welfare-due:'.$row->id.':'.$day, 'welfare_due', ['title' => 'Welfare check LPK hari '.$day.' diperlukan', 'day' => $day], 'incident.read', application: $application->id, automatic: true, stage: 'lpk', occurred: Carbon::parse($row->joined_at)->addDays($day)->toDateTimeString());
@@ -195,6 +198,7 @@ class CareJourney
         $this->authorize($user, $candidate, $closing ? 'incident.close' : 'incident.update');
         DB::transaction(function () use ($user, $candidate, $id, $data, $closing): void {
             $row = DB::table('care_issues')->where('candidate_id', $candidate->id)->where('id', $id)->lockForUpdate()->first() ?? abort(404);
+            $this->authorizeApplication($user, $row->application_id, $closing ? 'incident.close' : 'incident.update');
             $this->version($row, $data['version']);
             $transitions = ['OPEN' => ['ACKNOWLEDGED'], 'ACKNOWLEDGED' => ['IN_REVIEW', 'IN_ACTION'], 'IN_REVIEW' => ['IN_ACTION'], 'IN_ACTION' => ['MONITORING'], 'MONITORING' => ['IN_ACTION', 'RESOLVED'], 'RESOLVED' => ['CLOSED'], 'CLOSED' => []];
             if (! in_array($data['status'], $transitions[$row->status], true)) {
@@ -231,6 +235,7 @@ class CareJourney
         $this->authorize($user, $candidate, 'incident.escalate');
         DB::transaction(function () use ($user, $candidate, $id, $data): void {
             $row = DB::table('care_issues')->where('candidate_id', $candidate->id)->where('id', $id)->lockForUpdate()->first() ?? abort(404);
+            $this->authorizeApplication($user, $row->application_id, 'incident.escalate');
             $this->version($row, $data['version']);
             $states = ['REPORTED' => ['UNDER_REVIEW'], 'UNDER_REVIEW' => ['SUBSTANTIATED', 'INCONCLUSIVE'], 'SUBSTANTIATED' => ['RESOLVED'], 'INCONCLUSIVE' => ['RESOLVED'], 'RESOLVED' => []];
             if (! in_array($data['verification'], $states[$row->verification], true)) {
@@ -265,6 +270,13 @@ class CareJourney
                 }
             }
         });
+    }
+
+    private function authorizeApplication(User $user, ?int $applicationId, string $permission): void
+    {
+        if ($applicationId) {
+            abort_unless(app(AccessPolicy::class)->applicationIds($user, $permission)->where('applications.id', $applicationId)->exists(), 404);
+        }
     }
 
     private function version(object $row, int $version): void
@@ -470,8 +482,9 @@ class CareJourney
         $events = $this->ledger($user, $candidate);
         $canIssues = $this->allowed($user, $candidate, 'incident.read');
         $canHealth = $this->allowed($user, $candidate, 'health.prescreen.read') || $this->allowed($user, $candidate, 'health.mcu.summary.read');
-        $issues = $canIssues ? DB::table('care_issues')->where('candidate_id', $candidate->id)->where(fn ($q) => $q->whereNull('application_id')->orWhereIn('application_id', app(AccessPolicy::class)->applicationIds($user, 'incident.read')))->orderByDesc('id')->get()->map(function (object $row) use ($canHealth): object {
-            $row->data = $row->category === 'HEALTH' && ! $canHealth ? ['description' => 'Rincian kesehatan terbatas sesuai izin akses.'] : $this->decode($row->details);
+        $issues = $canIssues ? DB::table('care_issues')->where('candidate_id', $candidate->id)->where(fn ($q) => $q->whereNull('application_id')->orWhereIn('application_id', app(AccessPolicy::class)->applicationIds($user, 'incident.read')))->orderByDesc('id')->get()->map(function (object $row) use ($canHealth, $user): object {
+            $applicationHealth = ! $row->application_id || app(AccessPolicy::class)->applicationIds($user, 'health.prescreen.read')->where('applications.id', $row->application_id)->exists() || app(AccessPolicy::class)->applicationIds($user, 'health.mcu.summary.read')->where('applications.id', $row->application_id)->exists();
+            $row->data = $row->category === 'HEALTH' && (! $canHealth || ! $applicationHealth) ? ['description' => 'Rincian kesehatan terbatas sesuai izin akses.'] : $this->decode($row->details);
             $row->escalations = DB::table('care_escalations')->where('issue_id', $row->id)->get();
 
             return $row;

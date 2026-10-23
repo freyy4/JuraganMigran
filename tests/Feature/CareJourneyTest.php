@@ -186,6 +186,7 @@ class CareJourneyTest extends TestCase
         $this->assertDatabaseHas('care_events', ['candidate_id' => $candidate->id, 'event_type' => 'route_decision']);
         $this->assertDatabaseCount('applications', 0);
     }
+
     public function test_readonly_timeline_never_exposes_case_notes_or_other_users_support(): void
     {
         $owner = User::factory()->create();
@@ -205,5 +206,4 @@ class CareJourneyTest extends TestCase
         $this->get(route('candidates.print', $candidate))->assertOk()->assertSee('data-cpmi-auto-print', false);
         $this->assertDatabaseHas('audit_logs', ['action' => 'candidate.print']);
     }
-
 }

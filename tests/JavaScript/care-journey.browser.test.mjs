@@ -32,8 +32,8 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
         const evaluate = async expression => { const result = await send('Runtime.evaluate', {expression,returnByValue:true,awaitPromise:true}); if (result.exceptionDetails) throw Error(JSON.stringify(result.exceptionDetails)); return result.result.value; };
         await send('Page.enable');
         const navigate=async page=>{const previous=await evaluate('performance.timeOrigin');await send('Page.navigate',{url:origin+'/'+page});for(let i=0;i<100;i++){await delay(50);if(await evaluate(`performance.timeOrigin!==${previous}&&document.readyState==='complete'&&!!document.querySelector('.care-root')`))return;}throw Error('Page failed to load');};
-        const click=async selector=>{const point=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});};
-        const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(fixtures,name+'.png'),Buffer.from(data.data,'base64'));};
+        const click=async selector=>{const point=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({behavior:'instant',block:'center',inline:'center'});const r=e.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;if(x<0||x>innerWidth)throw Error('Control outside viewport');return{x,y}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});};
+        const screenshot=async name=>{const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(fixtures,name+'.png'),Buffer.from(data.data,'base64'));};
         for(const width of [1536,1366,1024,768,390]){
           await send('Emulation.setDeviceMetricsOverride',{width,height:1024,deviceScaleFactor:1,mobile:width<768});
           await navigate('care');
@@ -43,7 +43,7 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
           assert.equal(await evaluate(`document.querySelector('#care-touch-dialog').open`),true);
           await click('#care-touch-dialog [data-care-close]');
           await click('[data-care-support-stage="mcu"]');
-          assert.equal(await evaluate(`document.querySelector('#care-support-dialog [name=stage]').value`),'mcu');
+          assert.equal(await evaluate(`document.querySelector('#care-support-dialog [name=stage]').value`),'mcu','Selected MCU stage at '+width);
           assert.equal(await evaluate(`document.querySelector('#care-support-dialog').open`),true);
           await click('#care-support-dialog [data-care-close]');
           await click('[data-care-drag="transport"]');
@@ -56,7 +56,7 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
           await evaluate(`(()=>{const i=document.querySelector('[data-care-need-search]');i.value='dokumen';i.dispatchEvent(new Event('input'))})()`);
           assert.equal(await evaluate(`document.querySelectorAll('[data-care-need]:not([hidden])').length`),1);
           await evaluate(`(()=>{const i=document.querySelector('[data-care-need-search]');i.value='';i.dispatchEvent(new Event('input'))})()`);
-          await evaluate('scrollTo(0,0)');await screenshot('care-'+width);
+          await evaluate(`scrollTo(0,0);document.querySelector('.care-needs').scrollTop=0;document.querySelector('.care-board').scrollLeft=0`);await screenshot('care-'+width);
         }
         await evaluate(`document.documentElement.dataset.theme='dark'`);await screenshot('care-dark');
     }finally{socket?.close();chrome.kill();await new Promise(resolve=>server.close(resolve));}
