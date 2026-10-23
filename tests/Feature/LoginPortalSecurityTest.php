@@ -32,7 +32,7 @@ class LoginPortalSecurityTest extends TestCase
     public function test_login_shells_are_separate_lightweight_and_have_secure_headers(): void
     {
         foreach (['login' => 'Selamat Datang', 'portal.login' => 'Selamat Datang CPMI'] as $route => $heading) {
-            $response = $this->get(route($route))->assertOk()->assertSee($heading)->assertSee('authentication.css')->assertDontSee('portal-react.js')->assertDontSee('theme.js')->assertHeader('X-Content-Type-Options', 'nosniff')->assertHeader('Cache-Control', 'no-store, private');
+            $response = $this->get(route($route))->assertOk()->assertSee($heading)->assertSee('authentication.css')->assertDontSee('portal-react.js')->assertSee('theme.js')->assertSee('data-theme-toggle', false)->assertHeader('X-Content-Type-Options', 'nosniff')->assertHeader('Cache-Control', 'no-store, private');
             $this->assertStringContainsString("frame-ancestors 'none'", $response->headers->get('Content-Security-Policy'));
         }
         $this->get(route('password.request'))->assertOk();

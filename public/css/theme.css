@@ -98,3 +98,33 @@ html[data-theme=dark] :is(.system-security .quick-action-grid a:nth-child(2),.sy
 html[data-theme=dark] :is(.system-security .quick-action-grid a:nth-child(4),.finance-cockpit .direction-out .row-icon,.builder-info .badge){background:#423622!important;color:#f8dfaf!important;border-color:#735a34!important}
 html[data-theme=dark] :is(.system-section-nav a:hover,.quick-action-grid a:hover,.dashboard-links a:hover){background:#243d60!important;color:#d6e7ff!important;border-color:#5376a3!important}
 html[data-theme=dark] :is(.block-library button[data-add-block=video],.block-library button[data-add-block=faq])::before{background:#223753!important;color:#b5d4ff!important}
+
+/* Semantic surfaces shared by operations, marketing and integrations. */
+html[data-theme=dark]{--theme-info-bg:#203b5b;--theme-info-text:#bedaff;--theme-success-bg:#193e34;--theme-success-text:#b0efd3;--theme-warning-bg:#45351f;--theme-warning-text:#ffe0aa;--theme-danger-bg:#472735;--theme-danger-text:#ffc8d6;--theme-purple-bg:#352b4c;--theme-purple-text:#e0ccff}
+html[data-theme=dark] :is(.marketing-workspace .crm-tone-green,.crm-stage-4,.crm-kpi.crm-tone-green .crm-kpi-icon,.mc-state.connected,.qr-badge,.qr-health.HEALTHY){background:var(--theme-success-bg);color:var(--theme-success-text);border-color:#3a6b58}
+html[data-theme=dark] :is(.marketing-workspace .crm-tone-amber,.crm-stage-1,.qr-health,.sc-root .sc-color.amber){background:var(--theme-warning-bg);color:var(--theme-warning-text);border-color:#806841}
+html[data-theme=dark] :is(.marketing-workspace .crm-tone-red,.crm-stage-5,.crm-load-error,.crm-kpi.crm-tone-red .crm-kpi-icon,.qr-health.OFFLINE,.qr-health.REAUTH_REQUIRED,.sc-root .sc-pill.error){background:var(--theme-danger-bg);color:var(--theme-danger-text);border-color:#91546c}
+html[data-theme=dark] :is(.crm-stage-0,.crm-stage-2,.mc-stepper [aria-current=step],.mc-state){background:var(--theme-info-bg);color:var(--theme-info-text);border-color:#4b729c}
+html[data-theme=dark] .crm-stage-3{background:var(--theme-purple-bg);color:var(--theme-purple-text);border-color:#796495}
+html[data-theme=dark] :is(.qr-workspace,.master-workspace){--qr-soft:#203149;--master-border:#405773}
+html[data-theme=dark] .qr-health.MAINTENANCE{background:#26364b;color:#c3d3e6}
+html[data-theme=dark] .ops-calendar>span{background:#203149;color:#dce7f5}
+html[data-theme=dark] .ops-calendar .ops-calendar-today{outline-color:#91bdff}
+html[data-theme=dark] .public-site{--site-bg:#0f172a;--site-green:#68dcb1}
+html[data-theme=dark] .public-site :is(.site-detail,.site-content,.site-footer){color:var(--jm-text);background:var(--jm-bg)}
+html[data-theme=dark] .public-site :is(.site-detail h1,.site-detail h2,.site-detail h3,.site-detail dd,.site-section-heading h2,.site-section-heading h3){color:var(--jm-text)}
+html[data-theme=dark] .public-site :is(.site-salary,.site-content p,.site-content li){color:#bdd0e8}
+html[data-theme=dark] .public-site .site-salary strong{color:#83e6be}
+html[data-theme=dark] .portal-body :is(.portal-avatar,.portal-empty,.portal-document-empty){color:#c8ddf7}
+html[data-theme=dark] .portal-body :is(.portal-document-status,.portal-schedule-status){border-color:var(--jm-border)}
+html[data-theme=dark] .portal-skeleton{--skeleton-base:#233249;--skeleton-shine:#344a65}
+html[data-theme=dark] .wa-bubble{background:#173f37;color:#d6f7e8;border-color:#39715c}
+/* The selected swatch keeps a visible white check in either theme. */
+body.crm-layout #main-content .sc-root form label.sc-color{color:#fff!important;background:#1d5ecc}
+body.crm-layout #main-content .sc-root form label.sc-color.green{background:#067148}
+body.crm-layout #main-content .sc-root form label.sc-color.amber{background:#885900}
+body.crm-layout #main-content .sc-root form label.sc-color.purple{background:#7833b6}
+html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color{background:#244d85}
+html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color.green{background:#126346}
+html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color.amber{background:#5d421a}
+html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color.purple{background:#533c7f}

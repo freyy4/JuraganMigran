@@ -14,12 +14,12 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
         const url=new URL(request.url,'http://localhost');
         if(url.pathname.startsWith('/qa/')){
             const key=url.pathname.slice(4);if(!pages.some(page=>page.key===key)){response.writeHead(404);response.end();return;}
-            const html=fs.readFileSync(path.join(fixtures,key+'.html'),'utf8').replaceAll(/https?:\/\/[^/"\s]+\/(css|js)\//g,`${origin}/$1/`);
+            const html=fs.readFileSync(path.join(fixtures,key+'.html'),'utf8').replaceAll('https://juraganmigran.my.id',origin);
             response.setHeader('Content-Type','text/html');response.end(html);return;
         }
         const file=path.resolve('public','.'+url.pathname);
-        if((file.startsWith(path.resolve('public/css')+'/')||file.startsWith(path.resolve('public/js')+'/'))&&fs.existsSync(file)){
-            response.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':'text/css');response.end(fs.readFileSync(file));return;
+        if((file.startsWith(path.resolve('public/css')+'/')||file.startsWith(path.resolve('public/js')+'/')||file.startsWith(path.resolve('public/images')+'/'))&&fs.existsSync(file)){
+            response.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.webp')?'image/webp':'image/png');response.end(fs.readFileSync(file));return;
         }
         response.writeHead(404);response.end();
     });
@@ -34,13 +34,15 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
         const send=(method,params={})=>new Promise((resolve,reject)=>{const current=++id;pending.set(current,{resolve,reject});socket.send(JSON.stringify({id:current,method,params}));});
         const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
         await send('Page.enable');
+        await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
         await send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.setItem('jm-color-theme',new URLSearchParams(location.search).get('theme')||'light');`});
         const failures=[];
         for(const [theme,width,height] of [['dark',1440,1000],['light',390,844],['dark',390,844]]){
             await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
             for(const page of pages){
+                const previous=await evaluate('performance.timeOrigin');
                 await send('Page.navigate',{url:origin+'/qa/'+page.key+'?theme='+theme});
-                for(let attempt=0;attempt<100;attempt++){await delay(20);if(await evaluate(`document.readyState==='complete'&&!!document.getElementById('main-content')&&!!document.querySelector('link[href*="workspace-appearance"]')`))break;}
+                for(let attempt=0;attempt<100;attempt++){await delay(20);if(await evaluate(`performance.timeOrigin!==${previous}&&document.readyState==='complete'&&!!document.getElementById('main-content')&&!!document.querySelector('link[href*="workspace-appearance"]')`))break;}
                 const issues=await evaluate(`(()=>{
                     const issues=[],main=document.getElementById('main-content');if(!main)return ['missing main content'];
                     if(document.documentElement.dataset.theme!==${JSON.stringify(theme)})issues.push('theme not applied');
@@ -71,8 +73,8 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
                     const rgb=color=>(color.match(/[\\d.]+/g)||[]).map(Number);
                     const luminance=color=>{const channels=rgb(color).slice(0,3).map(channel=>{const v=channel/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;};
                     const background=node=>{while(node){const value=getComputedStyle(node).backgroundColor,channels=rgb(value);if(channels.length===3||channels[3]>=.95)return value;node=node.parentElement;}return ${theme==='dark'?"'rgb(15,23,42)'":"'rgb(255,255,255)'"};};
-                    if(${theme==='dark'})for(const node of main.querySelectorAll('.card,.contact,.cc-panel,.health-question,form fieldset,.card>header,.cc-panel>header')){
-                        if(!visible(node))continue;const color=getComputedStyle(node).backgroundColor,channels=rgb(color);if((channels.length===3||channels[3]>.9)&&Math.min(...channels.slice(0,3))>170)issues.push('light surface '+node.tagName+'.'+node.className+' '+color);
+                    if(${theme==='dark'})for(const node of main.querySelectorAll('section,article,dialog,[class]')){
+                        if(!visible(node)||node.matches('svg,svg *,img,canvas,iframe,input[type=color],.sc-color,[data-color-swatch]'))continue;const color=getComputedStyle(node).backgroundColor,channels=rgb(color);if((channels.length===3||channels[3]>.9)&&Math.min(...channels.slice(0,3))>170)issues.push('light surface '+node.tagName+'.'+node.className+' '+color);
                     }
                     for(const node of main.querySelectorAll('form input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),form select,form textarea')){
                         if(!visible(node))continue;const box=node.getBoundingClientRect(),style=getComputedStyle(node);
@@ -89,7 +91,7 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
                     return [...new Set(issues)].slice(0,12);
                 })()`);
                 if(issues.length)failures.push({page:page.key,theme,width,issues});
-                if(['form-candidates','form-settings.roles','crm-settings','menu-10-0','menu-7-2','menu-1-2'].includes(page.key)){
+                if(['form-candidates','form-settings.roles','crm-settings','menu-10-0','menu-7-2','menu-1-2','candidate-detail','care-journey'].includes(page.key)){
                     const screenshot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(fixtures,page.key+'-'+theme+'-'+width+'.png'),Buffer.from(screenshot.data,'base64'));
                 }
             }

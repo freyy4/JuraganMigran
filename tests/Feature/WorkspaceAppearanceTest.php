@@ -32,6 +32,8 @@ class WorkspaceAppearanceTest extends TestCase
                 $pages['form-'.$name] = route($name.'.create');
             }
         }
+        $pages['candidate-detail'] = route('candidates.show', $application->candidate_id);
+        $pages['care-journey'] = route('care.show', $application->candidate_id);
         $pages['form-candidate-edit'] = route('candidates.edit', $application->candidate_id);
         $pages['form-master'] = route('master-data.create', ['master' => 'jenis-dokumen']);
         $pages['form-health-template'] = route('health-templates.create');

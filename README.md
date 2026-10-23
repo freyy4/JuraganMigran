@@ -3,8 +3,8 @@
 Aplikasi operasional perekrutan dan penempatan pekerja migran, dari perolehan calon kandidat sampai kesiapan proses dan keberangkatan.
 
 <!-- APP-VERSION:START -->
-**Versi pencatatan:** `v0.1.45`<br>
-**Terakhir diperbarui:** 2026-10-23 19:15:05 WIB
+**Versi pencatatan:** `v0.1.46`<br>
+**Terakhir diperbarui:** 2026-10-23 19:20:04 WIB
 <!-- APP-VERSION:END -->
 
 ## Fitur utama
@@ -58,6 +58,7 @@ Ringkasan otomatis dibentuk dari file dan jenis perubahan. Ringkasan menjelaskan
 <!-- AUTO-UPDATES:START -->
 | Tanggal (WIB) | Versi | Update |
 | --- | --- | --- |
+| 2026-10-23 19:20:04 WIB | v0.1.46 | Update pengujian, tampilan, akun dan akses dan 1 bagian lainnya (8 file; 1 ditambah, 7 diubah). <!-- snapshot:ac6b2df3300ae9e8516a0ba89b695f7cacd20b70b42ecd4eec60ab9d33026c1f --> |
 | 2026-10-23 19:15:05 WIB | v0.1.45 | Update akun dan akses, tampilan (4 file; 4 diubah). <!-- snapshot:848f29cb2e02e607369824de38d5fdee40fff60c25e6132f75b41e6fef6e3cee --> |
 | 2026-10-23 19:05:05 WIB | v0.1.44 | Update pengujian, tampilan, care journey dan 1 bagian lainnya (7 file; 7 diubah). <!-- snapshot:4124404d2fd03cd52f77cfc56b7a3ed03ce5eddb5ea4069ca1db56a638ed7b03 --> |
 | 2026-10-23 19:00:05 WIB | v0.1.43 | Update pengujian, tampilan, app service provider dan 3 bagian lainnya (8 file; 8 diubah). <!-- snapshot:f3b48f4e2879d41d4bbee950a26e4881cf2e86a1e405f5dd4f60012dbebee085 --> |
