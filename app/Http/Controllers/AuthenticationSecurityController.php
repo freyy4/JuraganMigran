@@ -29,6 +29,9 @@ class AuthenticationSecurityController extends Controller
     public function verify(Request $request, AuthenticationSecurity $security): RedirectResponse|JsonResponse
     {
         $data = $request->validate(['code' => ['required', 'string', 'max:64'], 'challengeId' => ['nullable', 'string', 'size:64']]);
+        if ($request->routeIs('auth.staff.mfa.verify')) {
+            abort_unless($security->pending($request)->audience === 'staff', 403);
+        }
         if (isset($data['challengeId'])) {
             abort_unless(hash_equals($security->pending($request)->id, $data['challengeId']), 403);
         }

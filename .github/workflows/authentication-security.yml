@@ -1,0 +1,33 @@
+name: Authentication security
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  php-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, gd, zip
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer audit --locked --no-dev
+      - name: Authentication, session and RBAC tests
+        env:
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          LOG_CHANNEL: stderr
+        run: php artisan test --compact tests/Unit/TotpAuthenticatorTest.php tests/Feature/LoginPortalSecurityTest.php tests/Feature/AuthenticationTest.php tests/Feature/PrdGovernanceTest.php
+  sast:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.182.1
+    steps:
+      - uses: actions/checkout@v6
+      - name: Authentication source security scan
+        run: semgrep scan --config p/php --config p/javascript --severity ERROR --error --metrics=off app/Services/AuthenticationSecurity.php app/Services/AuthenticationThrottle.php app/Services/TotpAuthenticator.php app/Http/Controllers/AuthenticatedSessionController.php app/Http/Controllers/AuthenticationSecurityController.php app/Http/Controllers/AccountRecoveryController.php app/Http/Middleware/AuthenticationBoundary.php app/Http/Requests/LoginRequest.php public/js/authentication.js

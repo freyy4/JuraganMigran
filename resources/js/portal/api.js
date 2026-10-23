@@ -8,6 +8,10 @@ export async function request(url, { method = 'GET', body, signal } = {}) {
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const payload = await response.json().catch(() => ({}));
+    if (response.status === 403 && payload.code === 'REAUTH_REQUIRED') {
+        const next = new URL(payload.next, window.location.origin);
+        if (next.origin === window.location.origin && next.pathname === '/auth/confirm') window.location.assign(next.href);
+    }
     if (!response.ok || response.redirected) {
         const error = new Error(response.status === 419 ? 'Sesi formulir kedaluwarsa. Muat ulang halaman sebelum mengirim kembali.' : response.status === 429 ? 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.' : firstError(payload));
         error.status = response.status;

@@ -157,6 +157,12 @@ class AuthenticationSecurity
             $locked = DB::table('auth_challenges')->where('id', $challenge->id)->lockForUpdate()->first();
             abort_if($locked->consumed_at || $locked->expires_at <= now() || $locked->attempts >= config('security.challenge_attempts'), 403);
             $user = User::whereKey($locked->user_id)->where('is_active', true)->firstOrFail();
+            $allowed = $locked->audience === 'staff' ? ! $this->isPortal($user) : DB::table('portal_accounts')->where('user_id', $user->id)->where('status', 'active')->whereNotNull('phone_verified_at')->whereNotNull('activated_at')->whereIn('candidate_id', DB::table('candidates')->whereNull('deleted_at')->select('id'))->exists();
+            if (! $allowed) {
+                DB::table('auth_challenges')->where('id', $locked->id)->update(['consumed_at' => now()]);
+
+                return ['valid' => false];
+            }
             $factor = DB::table('auth_factors')->where('user_id', $user->id)->first();
             $enrollment = $locked->audience === 'staff' && ! $factor?->confirmed_at;
             $valid = $locked->audience === 'staff' ? $this->verifyFactor($user, $code, $enrollment) : ($locked->code_hash && hash_equals($locked->code_hash, hash_hmac('sha256', $code, config('app.key'))));

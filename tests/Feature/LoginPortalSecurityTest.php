@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\AuthenticationSecurity;
 use App\Services\AuthenticationThrottle;
 use App\Services\TotpAuthenticator;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -220,6 +221,41 @@ class LoginPortalSecurityTest extends TestCase
         $this->post(route('security.users.revoke', $other))->assertRedirect();
         $this->assertDatabaseHas('auth_session_records', ['user_id' => $other->id]);
         $this->assertSame(0, DB::table('auth_session_records')->where('user_id', $other->id)->whereNull('revoked_at')->count());
+    }
+
+    public function test_auth_endpoints_enforce_csrf_when_test_exemption_is_disabled(): void
+    {
+        $middleware = new class($this->app, $this->app['encrypter']) extends PreventRequestForgery
+        {
+            protected function runningUnitTests(): bool
+            {
+                return false;
+            }
+        };
+        $this->app->instance(PreventRequestForgery::class, $middleware);
+        foreach (['login.store', 'auth.staff.login', 'auth.cpmi.login', 'auth.staff.mfa.verify', 'password.email', 'password.update'] as $route) {
+            $this->post(route($route), [])->assertStatus(419);
+        }
+    }
+
+    public function test_secure_cookie_flags_and_tokens_are_never_stored_in_browser_auth_storage(): void
+    {
+        $response = $this->get('https://juraganmigran.my.id/login')->assertOk()->assertHeader('Strict-Transport-Security', 'max-age=31536000');
+        $cookie = collect($response->headers->getCookies())->first(fn ($cookie) => $cookie->getName() === config('session.cookie'));
+        $this->assertNotNull($cookie);
+        $this->assertTrue($cookie->isSecure());
+        $this->assertTrue($cookie->isHttpOnly());
+        $this->assertSame('lax', $cookie->getSameSite());
+        $this->assertStringNotContainsString('localStorage', file_get_contents(public_path('js/authentication.js')));
+        $this->assertStringNotContainsString('portal-react.js', file_get_contents(public_path('portal-sw.js')));
+    }
+
+    public function test_revocation_endpoint_cannot_be_used_by_non_administrators(): void
+    {
+        $cs = User::factory()->create(['crm_role_id' => DB::table('crm_roles')->where('code', 'cs')->value('id')]);
+        $other = User::factory()->create();
+        $this->actingAs($cs)->postJson(route('security.users.revoke', $other))->assertForbidden();
+        $this->assertSame(0, $other->fresh()->auth_version);
     }
 
     public function test_external_or_portal_intended_redirect_is_ignored_for_staff(): void

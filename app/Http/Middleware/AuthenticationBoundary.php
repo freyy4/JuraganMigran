@@ -14,6 +14,11 @@ class AuthenticationBoundary
 {
     public function handle(Request $request, Closure $next): Response
     {
+        return $this->headers($request, $this->authenticateRequest($request, $next));
+    }
+
+    private function authenticateRequest(Request $request, Closure $next): Response
+    {
         if (! app()->runningUnitTests() && str_starts_with(config('app.url'), 'https://') && ! $request->secure() && $request->isMethod('GET')) {
             return redirect()->secure($request->getRequestUri(), 302);
         }
@@ -21,7 +26,7 @@ class AuthenticationBoundary
             $security = app(AuthenticationSecurity::class);
             $state = $request->session()->get('security', []);
             $portal = $security->isPortal($user);
-            $policy = $portal ? 'cpmi' : ($user->crmRole()?->code === 'super_admin' ? 'super_admin' : 'staff');
+            $policy = $portal ? 'cpmi' : (($user->hasPermission('admin.permission.manage') && $user->hasPermission('admin.user.manage')) ? 'super_admin' : 'staff');
             $record = isset($state['record']) ? DB::table('auth_session_records')->where('id', $state['record'])->where('user_id', $user->id)->whereNull('revoked_at')->exists() : false;
             $user->refresh();
             if (! $user->is_active || ($state['user_id'] ?? null) !== $user->id || (! $portal && ! ($state['mfa'] ?? false)) || ! $record || ($state['version'] ?? -1) !== $user->auth_version || ($state['fingerprint'] ?? '') !== $security->fingerprint($user) || now()->timestamp - ($state['last_active_at'] ?? 0) >= config('security.'.$policy.'.idle_minutes') * 60 || now()->timestamp - ($state['started_at'] ?? 0) >= config('security.'.$policy.'.absolute_minutes') * 60) {
@@ -38,7 +43,12 @@ class AuthenticationBoundary
             $request->session()->put('security.last_active_at', now()->timestamp);
             DB::table('auth_session_records')->where('id', $state['record'])->update(['last_active_at' => now()]);
         }
-        $response = $next($request);
+
+        return $next($request);
+    }
+
+    private function headers(Request $request, Response $response): Response
+    {
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
@@ -51,7 +61,7 @@ class AuthenticationBoundary
             $response->headers->set('Referrer-Policy', 'no-referrer');
         }
         $response->headers->set('Content-Security-Policy', $login ? "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'" : "frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
-        if ($login || $request->user()) {
+        if ($login || $request->user() || $request->is('portal/*', 'api/portal/*', 'api/auth/*')) {
             $response->headers->set('Cache-Control', 'private, no-store');
         }
 

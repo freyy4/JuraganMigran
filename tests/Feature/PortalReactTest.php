@@ -78,7 +78,7 @@ class PortalReactTest extends TestCase
     {
         $user = $this->account(Application::factory()->create());
         $this->trustPortalDevice($user);
-        $this->postJson(route('portal.login.store'), ['email' => $user->email, 'password' => 'wrong'])->assertUnauthorized()->assertJsonPath('code','INVALID_CREDENTIALS');
+        $this->postJson(route('portal.login.store'), ['email' => $user->email, 'password' => 'wrong'])->assertUnauthorized()->assertJsonPath('code', 'INVALID_CREDENTIALS');
         $this->assertGuest();
         $this->postJson(route('portal.login.store'), ['email' => $user->email, 'password' => 'password'])->assertOk()->assertJsonPath('redirect', route('portal.home'))->assertHeader('Cache-Control', 'no-store, private');
         $this->assertAuthenticatedAs($user);
@@ -113,7 +113,8 @@ class PortalReactTest extends TestCase
         $application->vacancy->documentRequirements()->create(['document_type_id' => $type->id, 'is_required' => true]);
         $this->actingAs($this->account($application))->getJson(route('portal.api.documents'))->assertOk()->assertJsonPath('0.allowed_file_types', ['pdf'])->assertJsonPath('0.max_file_size_kb', 1024);
         $worker = file_get_contents(public_path('portal-sw.js'));
-        $this->assertStringContainsString("'/js/portal-react.js'", $worker);
+        $this->assertStringNotContainsString("'/js/portal-react.js'", $worker);
+        $this->assertStringContainsString("'/js/authentication.js'", $worker);
         $this->assertStringNotContainsString('cache.put', $worker);
         $this->assertStringNotContainsString("'/api/portal", $worker);
         $this->assertFileExists(public_path('js/portal-react.js'));

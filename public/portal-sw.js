@@ -1,5 +1,5 @@
-const CACHE = 'jm-portal-static-v9';
-const ASSETS = ['/portal-offline.html', '/css/portal.css', '/css/theme.css', '/js/theme.js', '/js/portal-pwa.js', '/js/portal-react.js', '/images/portal-icon-192.png', '/images/portal-icon-512.png'];
+const CACHE = 'jm-portal-static-v10';
+const ASSETS = ['/portal-offline.html', '/css/authentication.css', '/js/authentication.js', '/images/portal-icon-192.png', '/images/portal-icon-512.png'];
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
