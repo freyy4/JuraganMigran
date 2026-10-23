@@ -47,8 +47,16 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
             const targets=await evaluate(`Array.from(document.querySelectorAll('.auth-submit,.auth-password-toggle')).map(e=>e.getBoundingClientRect().height)`);
             assert.ok(targets.every(height=>height>=44),'Touch targets at least 44px');
             assert.equal(await evaluate(`Array.from(document.scripts).some(script=>script.src.includes('portal-react'))`),false,'No dashboard bundle before auth');
-            await evaluate('scrollTo(0,0)');await screenshot(audience+'-'+width);
+            await evaluate('document.activeElement?.blur();scrollTo(0,0)');await screenshot(audience+'-'+width);
           }
+        }
+        for(const width of [1448,390]){
+          await send('Emulation.setDeviceMetricsOverride',{width,height:1086,deviceScaleFactor:1,mobile:width<768});
+          await navigate('mfa');
+          assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'MFA has no horizontal overflow');
+          assert.equal(await evaluate(`document.querySelector('[name=code]').autocomplete`),'one-time-code');
+          await evaluate(`document.querySelector('.auth-secret code').textContent='KUNCI KHUSUS DATA UJI';scrollTo(0,0)`);
+          await screenshot('mfa-'+width);
         }
         await navigate('staff');
         await evaluate(`document.querySelector('[name=email]').value='example@example.test';document.querySelector('#password').value='browser-test-passphrase';window.authSubmitCount=0;document.querySelector('form').addEventListener('submit',event=>{event.preventDefault();window.authSubmitCount++});`);

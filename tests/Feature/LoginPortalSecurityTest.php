@@ -98,6 +98,13 @@ class LoginPortalSecurityTest extends TestCase
         $this->travel(11)->minutes();
         $this->get(route('auth.challenge'))->assertForbidden();
         $this->assertGuest();
+        $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+        for ($attempt = 0; $attempt < config('security.challenge_attempts'); $attempt++) {
+            $this->postJson(route('auth.challenge.verify'), ['code' => '000000'])->assertUnprocessable();
+            $this->travel(5)->seconds();
+        }
+        $this->get(route('auth.challenge'))->assertForbidden();
+        $this->assertGuest();
     }
 
     public function test_recovery_code_is_hashed_and_single_use(): void
@@ -245,7 +252,7 @@ class LoginPortalSecurityTest extends TestCase
         };
         $this->app->instance(PreventRequestForgery::class, $middleware);
         foreach (['login.store', 'auth.staff.login', 'auth.cpmi.login', 'auth.staff.mfa.verify', 'password.email', 'password.update'] as $route) {
-            $this->post(route($route), [])->assertStatus(419);
+            $this->post(route($route), [])->assertStatus(419)->assertHeader('X-Content-Type-Options', 'nosniff')->assertHeader('Cache-Control', 'no-store, private');
         }
     }
 

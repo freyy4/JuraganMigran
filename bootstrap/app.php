@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn (Request $request) => $request->user()->crmHomeUrl());
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->respond(fn (Response $response) => app(AuthenticationBoundary::class)->headers(request(), $response));
         $exceptions->dontFlash(['secret', 'access_token', 'app_secret', 'verify_token', 'pin', 'code', 'recovery_code', 'token', 'password_confirmation']);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),

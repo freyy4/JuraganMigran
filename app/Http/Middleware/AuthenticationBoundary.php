@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Services\AccessPolicy;
 use App\Services\AuthenticationSecurity;
 use Closure;
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +36,7 @@ class AuthenticationBoundary
                 $request->session()->regenerateToken();
                 app(AccessPolicy::class)->audit($user, 'auth.session.expired');
                 $middleware = $request->route()?->gatherMiddleware() ?? [];
-                $protected = collect($middleware)->contains(fn ($name) => $name === 'auth' || str_starts_with($name, 'auth:') || in_array($name, [CrmAccess::class, PortalAccess::class, \Illuminate\Auth\Middleware\Authenticate::class], true));
+                $protected = collect($middleware)->contains(fn ($name) => $name === 'auth' || str_starts_with($name, 'auth:') || in_array($name, [CrmAccess::class, PortalAccess::class, Authenticate::class], true));
                 if (! $protected) {
                     return $next($request);
                 }
@@ -52,7 +53,7 @@ class AuthenticationBoundary
         return $next($request);
     }
 
-    private function headers(Request $request, Response $response): Response
+    public function headers(Request $request, Response $response): Response
     {
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
