@@ -9,7 +9,7 @@
 <x-candidate-field name="whatsapp" label="WhatsApp petugas (kode negara)" :value="$row->whatsapp ?? ''" />
 <x-candidate-field name="team_id" label="ID tim (opsional)" type="number" min="1" :value="$row->team_id ?? ''" />
 <x-candidate-field name="email" label="Email" type="email" :value="$row->email ?? ''" required />
-<x-candidate-field name="password" :label="isset($row->id) ? 'Kata sandi baru (kosongkan jika tetap)' : 'Kata sandi (minimal 10 karakter)'" type="password" autocomplete="new-password" />
+<x-candidate-field name="password" :label="isset($row->id) ? 'Kata sandi baru (kosongkan jika tetap)' : 'Kata sandi (minimal 12 karakter)'" type="password" autocomplete="new-password" />
 <x-candidate-field name="password_confirmation" label="Konfirmasi kata sandi" type="password" autocomplete="new-password" />
 <div><label for="crm_role_id">Peran</label><select id="crm_role_id" name="crm_role_id" required><option value="">Pilih peran</option>@foreach($roles as $role)<option value="{{ $role->id }}" @selected((string)old('crm_role_id',$row->crm_role_id ?? '') === (string)$role->id)>{{ $role->name }}</option>@endforeach</select>@if($roles->isEmpty())<p class="muted">Tambahkan peran melalui menu Peran & Hak Akses terlebih dahulu.</p>@endif</div>
 @break
@@ -48,4 +48,7 @@
 @if(in_array($module,['users','automation','templates']))<div><label for="is_active">Status</label><select name="is_active" id="is_active"><option value="1" @selected(old('is_active',$row->is_active ?? true))>Aktif</option><option value="0" @selected(!old('is_active',$row->is_active ?? true))>Tidak aktif</option></select></div>@endif
 <div class="full footer-actions"><button>Simpan</button></div>
 </form>
+@if($module === 'users' && isset($row->id) && $row->id !== auth()->id() && auth()->user()->hasPermission('admin.user.manage'))
+<section class="card"><h2>Keamanan akun</h2><p>Cabut sesi pengguna agar perangkatnya diminta masuk dan menyelesaikan verifikasi kembali.</p><form method="POST" action="{{ route('security.users.revoke',$row->id) }}">@csrf<button type="submit" class="danger">Cabut semua sesi pengguna</button></form></section>
+@endif
 @endsection

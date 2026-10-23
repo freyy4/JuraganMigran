@@ -3,3 +3,4 @@
 .auth-consent{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.7;margin:18px 0 25px;min-height:44px}.auth-consent input{width:18px;height:18px;flex-shrink:0;margin-top:3px}
 
 @media(min-width:1101px){.auth-form-content{transform:translateY(24px)}.auth-footer{bottom:4px}}
+a,.auth-text-button{color:#0072df}.auth-submit{color:#fff;background:linear-gradient(110deg,#0876cf,#1179ce)}.auth-input input::placeholder,.auth-support,.auth-footer p{color:#5f7392}

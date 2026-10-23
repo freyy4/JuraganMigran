@@ -18,7 +18,7 @@ class AuthenticationSecurity
 
     public function isPortal(User $user): bool
     {
-        return DB::table('portal_accounts')->where('user_id', $user->id)->exists();
+        return $user->crmRole()?->code === 'cpmi' || DB::table('portal_accounts')->where('user_id', $user->id)->exists();
     }
 
     public function verifiedPassword(?User $user, string $password): bool

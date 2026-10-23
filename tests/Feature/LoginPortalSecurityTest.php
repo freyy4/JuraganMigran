@@ -139,7 +139,7 @@ class LoginPortalSecurityTest extends TestCase
     public function test_portal_accepts_normalized_verified_whatsapp_and_requires_new_device_verification(): void
     {
         $user = $this->portalAccount();
-        $this->postJson(route('auth.cpmi.login'), ['identifier' => '0812 3456 7890', 'password' => 'password'])->assertOk()->assertJsonPath('mfaRequired', true)->assertJsonPath('next', route('auth.challenge'));
+        $this->postJson(route('auth.cpmi.login'), ['identifier' => '0812 3456 7890', 'password' => 'password'])->assertOk()->assertJsonPath('mfaRequired', true)->assertJsonPath('next', '/auth/challenge');
         $this->assertGuest();
         $challenge = DB::table('auth_challenges')->where('user_id', $user->id)->first();
         $this->assertNotNull($challenge->code_hash);
@@ -154,7 +154,7 @@ class LoginPortalSecurityTest extends TestCase
         $user = $this->portalAccount();
         $token = str_repeat('a', 64);
         DB::table('auth_devices')->insert(['user_id' => $user->id, 'token_hash' => hash('sha256', $token), 'user_agent' => 'Test browser', 'last_seen_at' => now(), 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
-        $this->withCredentials()->withCookie('jm_auth_device', $token)->withHeader('User-Agent', 'Test browser')->postJson(route('auth.cpmi.login'), ['identifier' => $user->email, 'password' => 'password'])->assertOk()->assertJsonPath('next', route('portal.home'))->assertJsonMissingPath('mfaRequired');
+        $this->withCredentials()->withCookie('jm_auth_device', $token)->withHeader('User-Agent', 'Test browser')->postJson(route('auth.cpmi.login'), ['identifier' => $user->email, 'password' => 'password'])->assertOk()->assertJsonPath('next', '/portal')->assertJsonMissingPath('mfaRequired');
         $this->assertAuthenticatedAs($user);
     }
 
@@ -163,6 +163,8 @@ class LoginPortalSecurityTest extends TestCase
         $staff = User::factory()->create();
         $portal = $this->portalAccount();
         $this->postJson(route('auth.staff.login'), ['email' => $portal->email, 'password' => 'password'])->assertUnauthorized()->assertJsonPath('code', 'INVALID_CREDENTIALS');
+        $unactivated = User::factory()->create(['crm_role_id' => DB::table('crm_roles')->where('code', 'cpmi')->value('id')]);
+        $this->postJson(route('auth.staff.login'), ['email' => $unactivated->email, 'password' => 'password'])->assertUnauthorized()->assertJsonPath('code', 'INVALID_CREDENTIALS');
         $known = $this->postJson(route('auth.cpmi.login'), ['identifier' => $staff->email, 'password' => 'password'])->assertUnauthorized();
         $missing = $this->postJson(route('auth.cpmi.login'), ['identifier' => 'absent@example.test', 'password' => 'password'])->assertUnauthorized();
         $this->assertSame($known->json(), $missing->json());
@@ -236,6 +238,7 @@ class LoginPortalSecurityTest extends TestCase
         $other = User::factory()->create(['name' => 'Other private person']);
         $this->actingAs($other);
         $this->actingAs($mine)->get(route('auth.sessions'))->assertOk()->assertDontSee('Other private person')->assertDontSee('session_hash');
+        $this->get(route('settings.users.edit', $other))->assertOk()->assertSee(route('security.users.revoke', $other));
         $this->post(route('security.users.revoke', $other))->assertRedirect();
         $this->assertDatabaseHas('auth_session_records', ['user_id' => $other->id]);
         $this->assertSame(0, DB::table('auth_session_records')->where('user_id', $other->id)->whereNull('revoked_at')->count());

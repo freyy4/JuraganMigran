@@ -53,7 +53,12 @@ class PortalController extends Controller
             throw $exception;
         }
 
-        return $request->expectsJson() ? response()->json($result + ['redirect' => $result['next']])->header('Cache-Control', 'private, no-store') : redirect($result['next']);
+        $redirect = $result['next'];
+        if ($request->routeIs('auth.cpmi.login')) {
+            $result['next'] = parse_url($result['next'], PHP_URL_PATH);
+        }
+
+        return $request->expectsJson() ? response()->json($result + ['redirect' => $redirect])->header('Cache-Control', 'private, no-store') : redirect($redirect);
     }
 
     public function invite(Request $request, Candidate $candidate): RedirectResponse

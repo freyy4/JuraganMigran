@@ -44,6 +44,9 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin=`http://
             assert.equal(await evaluate(`document.querySelector('#password').type`),'password');
             await click('[data-password-toggle]');assert.equal(await evaluate(`document.querySelector('#password').type`),'text');
             await click('[data-password-toggle]');assert.equal(await evaluate(`document.querySelector('#password').type`),'password');
+            const colors=await evaluate(`({placeholder:getComputedStyle(document.querySelector('input'),'::placeholder').color,gradient:getComputedStyle(document.querySelector('.auth-submit')).backgroundImage.match(/rgb\\([^)]*\\)/g),link:getComputedStyle(document.querySelector('.auth-forgot a')).color})`);
+            const ratio=color=>{const values=color.match(/\d+/g).slice(0,3).map(Number).map(value=>{const c=value/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4});return 1.05/(values[0]*.2126+values[1]*.7152+values[2]*.0722+.05)};
+            for(const color of [colors.placeholder,colors.link,...colors.gradient])assert.ok(ratio(color)>=4.5,'Readable text contrast: '+color);
             const targets=await evaluate(`Array.from(document.querySelectorAll('.auth-submit,.auth-password-toggle')).map(e=>e.getBoundingClientRect().height)`);
             assert.ok(targets.every(height=>height>=44),'Touch targets at least 44px');
             assert.equal(await evaluate(`Array.from(document.scripts).some(script=>script.src.includes('portal-react'))`),false,'No dashboard bundle before auth');
