@@ -97,7 +97,7 @@ class PortalController extends Controller
 
     public function activate(Request $request, string $token): RedirectResponse
     {
-        $data = $request->validate(['password' => ['required', 'string', 'min:10', 'max:255', 'confirmed'], 'consent' => ['accepted']]);
+        $data = $request->validate(['password' => ['required', 'string', new \App\Rules\SafePassphrase, 'max:255', 'confirmed'], 'consent' => ['accepted']]);
         $user = DB::transaction(function () use ($token, $data): User {
             $invitation = $this->validInvitation($token);
             $invitation = DB::table('portal_invitations')->where('id', $invitation->id)->lockForUpdate()->first();

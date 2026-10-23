@@ -21,18 +21,10 @@ class PortalReactTest extends TestCase
         return $user;
     }
 
-    public function test_login_page_mounts_react_without_exposing_candidate_data(): void
+    public function test_login_shell_does_not_load_dashboard_react_or_expose_candidate_data(): void
     {
         $response = $this->get(route('portal.login'));
-        $response->assertOk()->assertSee('portal-react-root')->assertSee('portal-react.js')->assertSee('name="csrf-token"', false);
-        preg_match('/<script id="portal-react-bootstrap" type="application\/json">(.*?)<\/script>/s', $response->getContent(), $matches);
-        $bootstrap = json_decode($matches[1], true, flags: JSON_THROW_ON_ERROR);
-        $this->assertSame('login', $bootstrap['page']);
-        $this->assertArrayNotHasKey('data', $bootstrap);
-
-        if (getenv('JM_REACT_VISUAL_QA')) {
-            file_put_contents('/tmp/jm-react-login.html', preg_replace('~https?://[^/]+/(css|js|images)/~', 'file://'.public_path().'/$1/', $response->getContent()));
-        }
+        $response->assertOk()->assertSee('authentication.js')->assertDontSee('portal-react.js')->assertSee('name="csrf-token"', false)->assertDontSee('portal-react-bootstrap');
     }
 
     public function test_staff_session_is_redirected_to_portal_login_without_losing_admin_access(): void
@@ -52,7 +44,7 @@ class PortalReactTest extends TestCase
         $user = $this->account($application);
         DB::table('portal_accounts')->where('user_id', $user->id)->update(['status' => 'revoked']);
         $this->actingAs($user)->get(route('portal.documents'))->assertRedirect(route('portal.login'))->assertSessionHasErrors('email');
-        $this->get(route('portal.login'))->assertOk()->assertSee('Hubungi CS untuk undangan baru')->assertDontSee($name)->assertDontSee('Kembali ke dasbor admin');
+        $this->get(route('portal.login'))->assertOk()->assertSee('Hubungi CS')->assertDontSee($name)->assertDontSee('Kembali ke dasbor admin');
         $this->getJson(route('portal.api.summary'))->assertForbidden();
     }
 
@@ -85,7 +77,8 @@ class PortalReactTest extends TestCase
     public function test_json_login_regenerates_session_and_only_accepts_cpmi_credentials(): void
     {
         $user = $this->account(Application::factory()->create());
-        $this->postJson(route('portal.login.store'), ['email' => $user->email, 'password' => 'wrong'])->assertUnprocessable()->assertJsonValidationErrors('email');
+        $this->trustPortalDevice($user);
+        $this->postJson(route('portal.login.store'), ['email' => $user->email, 'password' => 'wrong'])->assertUnauthorized()->assertJsonPath('code','INVALID_CREDENTIALS');
         $this->assertGuest();
         $this->postJson(route('portal.login.store'), ['email' => $user->email, 'password' => 'password'])->assertOk()->assertJsonPath('redirect', route('portal.home'))->assertHeader('Cache-Control', 'no-store, private');
         $this->assertAuthenticatedAs($user);

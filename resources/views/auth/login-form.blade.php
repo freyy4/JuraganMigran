@@ -1,7 +1,9 @@
-<h2 id="auth-heading">{{ $audience==='cpmi'?'Selamat Datang CPMI':'Selamat Datang' }}@if($audience==='staff')<br>Tim Juragan Migran@endif</h2><p class="auth-subtitle">{{ $audience==='cpmi'?'Masuk ke akun Anda':'Masuk untuk mulai bekerja hari ini' }}</p>
+<h2 id="auth-heading">{{ $audience==='cpmi'?'Selamat Datang CPMI':'Selamat Datang' }}@if($audience==='staff')<br>Tim Juragan Migran
+@endif</h2><p class="auth-subtitle">{{ $audience==='cpmi'?'Masuk ke akun Anda':'Masuk untuk mulai bekerja hari ini' }}</p>
 @if($audience==='cpmi'&&($staffSession??false))<div class="auth-notice">Anda sedang menggunakan akun admin/petugas. Gunakan akun CPMI untuk portal ini. <a href="{{ route('dashboard') }}">Kembali ke dasbor admin</a></div>@endif
 <form method="POST" action="{{ $audience==='cpmi'?route('portal.login.store'):route('login.store') }}" data-auth-form>@csrf
 <x-auth-input :name="$audience==='cpmi'?'identifier':'email'" :label="$audience==='cpmi'?'Email / No. WhatsApp':'Email Staff'" :type="$audience==='cpmi'?'text':'email'" :placeholder="$audience==='cpmi'?'contoh: nama@email.com atau 08xxxxxxxx':'contoh: nama@juraganmigran.com'" autocomplete="username" :value="old('email')"/>
 <x-auth-input name="password" label="Kata sandi" type="password" placeholder="Masukkan kata sandi" autocomplete="current-password" icon="lock"/>
 <div class="auth-forgot"><a href="{{ route('password.request',['audience'=>$audience]) }}">Lupa kata sandi?</a></div><button class="auth-submit" type="submit"><span>{{ $audience==='cpmi'?'Masuk':'Masuk ke Dashboard' }}</span><x-ui-icon name="arrow"/></button></form>
 <p class="auth-support">{{ $audience==='cpmi'?'Belum punya akses?':'Butuh akses?' }} <a href="{{ route('password.request',['audience'=>$audience]) }}">{{ $audience==='cpmi'?'Hubungi CS':'Hubungi Admin' }}</a></p>
+@if($audience==='cpmi')<button type="button" class="auth-text-button auth-install" data-install hidden>Pasang di layar utama</button>@endif

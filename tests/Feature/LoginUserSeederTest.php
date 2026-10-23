@@ -24,6 +24,8 @@ class LoginUserSeederTest extends TestCase
         $this->assertDatabaseCount('users', 1);
         $this->assertTrue(Hash::check('kata-sandi-pengujian', $user->fresh()->password));
         $this->post(route('login.store'), ['email' => $user->email, 'password' => 'kata-sandi-pengujian'])->assertSessionHasNoErrors();
+        $this->assertGuest();
+        $this->completeStaffMfa($user);
         $this->assertAuthenticatedAs($user);
         $this->get(route('candidates.index'))->assertOk();
         $response = $this->get(route('dashboard'))->assertOk()->assertSee('Dashboard Superadmin')->assertViewIs('cockpit.menu')->assertViewHas('groups', fn ($groups) => collect($groups)->flatMap(fn ($group) => $group['items'])->contains('route', 'health-templates.index') && ! collect($groups)->flatMap(fn ($group) => $group['items'])->contains('route', 'health-screenings.index'))->assertDontSee('Pengguna aktif')->assertDontSee('Tindakan konfigurasi');

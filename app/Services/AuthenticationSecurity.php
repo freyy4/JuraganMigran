@@ -199,6 +199,7 @@ class AuthenticationSecurity
 
     public function finish(Request $request, User $user, string $audience): void
     {
+        $user->refresh();
         $newDevice = ! $this->knownDevice($request, $user);
         Auth::login($user, false);
         $request->session()->forget(['auth.pending', 'security']);

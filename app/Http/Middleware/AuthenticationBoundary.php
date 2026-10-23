@@ -47,6 +47,9 @@ class AuthenticationBoundary
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000');
         }
         $login = $request->routeIs('login*', 'portal.login*', 'auth.*', 'password.*') || $request->is('api/auth/*');
+        if ($login) {
+            $response->headers->set('Referrer-Policy', 'no-referrer');
+        }
         $response->headers->set('Content-Security-Policy', $login ? "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'" : "frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
         if ($login || $request->user()) {
             $response->headers->set('Cache-Control', 'private, no-store');

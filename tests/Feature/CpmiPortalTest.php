@@ -50,19 +50,20 @@ class CpmiPortalTest extends TestCase
         foreach ([$mine->candidate_id => 'Jadwal Anda telah ditetapkan', $other->candidate_id => 'Notifikasi pribadi orang lain'] as $id => $title) {
             DB::table('portal_notifications')->insert(['candidate_id' => $id, 'category' => 'SCHEDULE', 'title' => $title, 'body_safe' => 'Periksa jadwal pada portal.', 'deep_link' => '/portal/schedules', 'created_at' => now(), 'updated_at' => now()]);
         }
-        $this->actingAs($user)->get(route('portal.home'))->assertOk()->assertSee('Progres Anda')->assertSee('Ringkasan Anda')->assertSee('Dokumen terverifikasi')->assertSee('Pasang di layar utama')->assertSee('portal.webmanifest')->assertSee('TAHAP ANDA SEKARANG')->assertSee('Upload dokumen')->assertSee('Hubungi CS')->assertSee('Jadwal Anda telah ditetapkan')->assertSee('Ada notifikasi belum dibaca')->assertDontSee('Notifikasi pribadi orang lain')->assertDontSee('Exposure / klaim');
+        $this->actingAs($user)->get(route('portal.home'))->assertOk()->assertSee('Progres Anda')->assertSee('Ringkasan Anda')->assertSee('Dokumen terverifikasi')->assertSee('data-install', false)->assertSee('portal.webmanifest')->assertSee('TAHAP ANDA SEKARANG')->assertSee('Upload dokumen')->assertSee('Hubungi CS')->assertSee('Jadwal Anda telah ditetapkan')->assertSee('Ada notifikasi belum dibaca')->assertDontSee('Notifikasi pribadi orang lain')->assertDontSee('Exposure / klaim');
     }
 
     public function test_portal_login_accepts_email_and_rejects_wrong_password_or_staff_account(): void
     {
         $user = $this->account(Application::factory()->create());
         $this->post(route('portal.login.store'), ['email' => $user->email, 'password' => 'wrong-password'])
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasErrors('identifier');
         $this->assertGuest();
         $staff = User::factory()->create();
         $this->post(route('portal.login.store'), ['email' => $staff->email, 'password' => 'password'])
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasErrors('identifier');
         $this->assertGuest();
+        $this->trustPortalDevice($user);
         $this->post(route('portal.login.store'), ['email' => '  '.strtoupper($user->email).'  ', 'password' => 'password'])
             ->assertRedirect(route('portal.home'));
         $this->assertAuthenticatedAs($user);
@@ -72,8 +73,8 @@ class CpmiPortalTest extends TestCase
     public function test_login_supports_installation_with_complete_public_assets(): void
     {
         $this->get(route('portal.login'))->assertOk()
-            ->assertSee('portal.webmanifest')->assertSee('portal-pwa.js')
-            ->assertSee('data-password-toggle', false)->assertSee('Pasang di layar utama');
+            ->assertSee('portal.webmanifest')->assertSee('authentication.js')
+            ->assertSee('data-password-toggle', false)->assertSee('data-install', false);
 
         $manifest = json_decode(file_get_contents(public_path('portal.webmanifest')), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame('/portal', $manifest['start_url']);

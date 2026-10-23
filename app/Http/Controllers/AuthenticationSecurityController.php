@@ -28,7 +28,10 @@ class AuthenticationSecurityController extends Controller
 
     public function verify(Request $request, AuthenticationSecurity $security): RedirectResponse|JsonResponse
     {
-        $data = $request->validate(['code' => ['required', 'string', 'max:64']]);
+        $data = $request->validate(['code' => ['required', 'string', 'max:64'], 'challengeId' => ['nullable', 'string', 'size:64']]);
+        if (isset($data['challengeId'])) {
+            abort_unless(hash_equals($security->pending($request)->id, $data['challengeId']), 403);
+        }
         $result = $security->verifyChallenge($request, $data['code']);
         $next = $security->destination($request, $result['user'], $result['audience']);
         if ($result['codes']) {

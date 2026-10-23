@@ -32,7 +32,10 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create(['password' => Hash::make('kata-sandi-rahasia')]);
         $this->get(route('applications.index'))->assertRedirect(route('login'));
-        $this->post(route('login.store'), ['email' => $user->email, 'password' => 'kata-sandi-rahasia', 'remember' => 1])->assertSessionHasNoErrors()->assertRedirect(route('applications.index'));
+        $this->post(route('login.store'), ['email' => $user->email, 'password' => 'kata-sandi-rahasia', 'remember' => 1])->assertSessionHasNoErrors()->assertRedirect(route('auth.challenge'));
+        $this->assertGuest();
+        $this->completeStaffMfa($user)->assertRedirect(route('auth.recovery-codes'));
+        $this->assertSame(route('applications.index'), session('auth.after_recovery'));
         $this->assertAuthenticatedAs($user);
         $this->get(route('login'))->assertRedirect(route('dashboard'));
         $this->get(route('applications.index'))->assertOk()->assertSee('Keluar');
@@ -56,8 +59,9 @@ class AuthenticationTest extends TestCase
         $response->assertSessionHasErrors('email');
         $this->assertStringContainsString('Terlalu banyak percobaan', session('errors')->first('email'));
         $this->assertGuest();
-        RateLimiter::clear(strtolower($user->email).'|127.0.0.1');
+        $this->travel(config('security.throttle.decay') + 1)->seconds();
         $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])->assertSessionHasNoErrors();
+        $this->completeStaffMfa($user);
         $this->assertAuthenticatedAs($user);
     }
 

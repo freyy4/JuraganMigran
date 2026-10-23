@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'dummy_hash' => '$argon2id$v=19$m=19456,t=2,p=1$eWl2LnhWbi5OOVlUQlUweQ$dUc40QZsip41fw7T4nKJ1A3CRxRAU+scDpWZJKkF2IA',
     'throttle' => ['account' => 5, 'ip' => 30, 'device' => 12, 'decay' => 300, 'backoff_after' => 3, 'backoff_max' => 60],
     'challenge_minutes' => 10,
     'challenge_attempts' => 5,

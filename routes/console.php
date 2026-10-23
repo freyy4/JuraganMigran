@@ -18,3 +18,5 @@ Schedule::command('crm:dispatch')->everyTenSeconds()->withoutOverlapping();
 Schedule::command('whatsapp:qr-health')->everyMinute()->withoutOverlapping();
 
 Schedule::command('crm:process-workspace')->everyMinute()->withoutOverlapping();
+
+Schedule::command('security:prune')->daily()->withoutOverlapping();
