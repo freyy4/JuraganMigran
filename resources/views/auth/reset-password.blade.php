@@ -1,0 +1,3 @@
+@extends('layouts.authentication',['audience'=>'staff'])
+@section('title','Kata sandi baru')
+@section('content')<h2 id="auth-heading">Buat kata sandi baru</h2><p class="auth-subtitle">Gunakan frasa sandi unik minimal 12 karakter.</p><form method="POST" action="{{ route('password.update') }}" data-auth-form>@csrf<input type="hidden" name="token" value="{{ $token }}"><x-auth-input name="password" label="Kata sandi baru" type="password" autocomplete="new-password" icon="lock"/><x-auth-input name="password_confirmation" label="Ulangi kata sandi" type="password" autocomplete="new-password" icon="lock"/><button class="auth-submit" type="submit">Simpan kata sandi <x-ui-icon name="arrow"/></button></form>@endsection

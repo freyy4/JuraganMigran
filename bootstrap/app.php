@@ -14,12 +14,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->preventRequestForgery(except: ['api/webhooks/whatsapp', 'api/webhooks/whatsapp-qr']);
-        $middleware->web(append: [NormalizeMoneyInputs::class]);
-        $middleware->redirectGuestsTo(fn () => route('login'));
+        $middleware->web(append: [\App\Http\Middleware\AuthenticationBoundary::class, NormalizeMoneyInputs::class]);
+        $middleware->redirectGuestsTo(fn (Request $request) => route($request->is('portal/*', 'api/portal/*') ? 'portal.login' : 'login'));
         $middleware->redirectUsersTo(fn (Request $request) => $request->user()->crmHomeUrl());
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['secret', 'access_token', 'app_secret', 'verify_token', 'pin', 'code']);
+        $exceptions->dontFlash(['secret', 'access_token', 'app_secret', 'verify_token', 'pin', 'code', 'recovery_code', 'token', 'password_confirmation']);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

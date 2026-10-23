@@ -1,0 +1,3 @@
+@extends('layouts.authentication',['audience'=>'staff'])
+@section('title','Simpan kode pemulihan')
+@section('content')<h2 id="auth-heading">Simpan kode pemulihan</h2><p class="auth-subtitle">Setiap kode hanya dapat digunakan sekali jika authenticator tidak dapat diakses.</p><div class="auth-recovery-codes">@foreach($codes as $code)<code>{{ $code }}</code>@endforeach</div><p class="auth-caption">Kode hanya ditampilkan sekali. Simpan di password manager atau tempat aman sebelum melanjutkan. Jangan kirim kode kepada siapa pun.</p><a class="auth-submit" href="{{ $next }}">Saya sudah menyimpan kode <x-ui-icon name="arrow"/></a>@endsection

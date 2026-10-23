@@ -76,7 +76,25 @@ Route::middleware(['auth', PortalAccess::class])->group(function (): void {
 Route::middleware('guest')->group(function (): void {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
+    Route::post('api/auth/staff/login', [AuthenticatedSessionController::class, 'store'])->name('auth.staff.login');
 });
+Route::get('auth/challenge', [\App\Http\Controllers\AuthenticationSecurityController::class, 'challenge'])->name('auth.challenge');
+Route::post('auth/challenge', [\App\Http\Controllers\AuthenticationSecurityController::class, 'verify'])->block(10, 10)->name('auth.challenge.verify');
+Route::post('api/auth/staff/mfa/verify', [\App\Http\Controllers\AuthenticationSecurityController::class, 'verify'])->block(10, 10)->name('auth.staff.mfa.verify');
+Route::post('auth/cancel', [\App\Http\Controllers\AuthenticationSecurityController::class, 'cancel'])->name('auth.cancel');
+Route::middleware('auth')->group(function (): void {
+    Route::get('auth/recovery-codes', [\App\Http\Controllers\AuthenticationSecurityController::class, 'recoveryCodes'])->name('auth.recovery-codes');
+    Route::get('auth/sessions', [\App\Http\Controllers\AuthenticationSecurityController::class, 'sessions'])->name('auth.sessions');
+    Route::post('auth/sessions/revoke', [\App\Http\Controllers\AuthenticationSecurityController::class, 'revoke'])->name('auth.sessions.revoke');
+    Route::post('security/users/{user}/revoke-sessions', [\App\Http\Controllers\AuthenticationSecurityController::class, 'revokeUser'])->name('security.users.revoke');
+    Route::get('auth/confirm', [\App\Http\Controllers\AuthenticationSecurityController::class, 'reauthenticate'])->name('auth.reauthenticate');
+    Route::post('auth/confirm', [\App\Http\Controllers\AuthenticationSecurityController::class, 'confirm'])->name('auth.confirm');
+});
+Route::get('forgot-password', [\App\Http\Controllers\AccountRecoveryController::class, 'create'])->name('password.request');
+Route::post('forgot-password', [\App\Http\Controllers\AccountRecoveryController::class, 'store'])->name('password.email');
+Route::get('reset-password/{token}', [\App\Http\Controllers\AccountRecoveryController::class, 'edit'])->name('password.reset');
+Route::post('reset-password', [\App\Http\Controllers\AccountRecoveryController::class, 'update'])->block(10, 10)->name('password.update');
+
 
 Route::get('funnel-media/{funnel}/{file}', [FunnelController::class, 'media'])->whereNumber('funnel')->where('file', '[a-f0-9-]{36}\\.(jpg|png|webp)')->name('funnel-media.show');
 
@@ -494,8 +512,9 @@ Route::post('apply/{slug}', [FunnelPublicController::class, 'store'])->middlewar
 Route::get('apply/{slug}/thank-you/{token}', [FunnelPublicController::class, 'thankYou'])->name('apply.thank-you');
 Route::post('apply/{slug}/whatsapp/{token}', [FunnelPublicController::class, 'whatsapp'])->middleware('throttle:10,1')->name('apply.whatsapp');
 Route::post('apply/{slug}/events', [FunnelPublicController::class, 'event'])->middleware('throttle:30,1')->name('apply.event');
+Route::post('api/auth/cpmi/login', [PortalController::class, 'authenticate'])->name('auth.cpmi.login');
 Route::get('portal/login', [PortalController::class, 'login'])->name('portal.login');
-Route::post('portal/login', [PortalController::class, 'authenticate'])->middleware('throttle:5,1')->name('portal.login.store');
+Route::post('portal/login', [PortalController::class, 'authenticate'])->name('portal.login.store');
 Route::get('portal/invitation/{token}', [PortalController::class, 'invitation'])->middleware('throttle:10,1')->name('portal.invitation');
 Route::post('portal/invitation/{token}', [PortalController::class, 'activate'])->middleware('throttle:5,1')->block(10, 10)->name('portal.activate');
 Route::middleware(PortalAccess::class)->group(function (): void {

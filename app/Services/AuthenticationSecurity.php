@@ -232,7 +232,7 @@ class AuthenticationSecurity
     {
         $transport = config('mail.mailers.'.config('mail.default').'.transport');
 
-        return app()->runningUnitTests() || in_array($transport, ['smtp', 'ses', 'ses-v2', 'postmark', 'resend', 'mailgun', 'sendmail'], true);
+        return ($transport === 'array' && app()->runningUnitTests()) || in_array($transport, ['smtp', 'ses', 'ses-v2', 'postmark', 'resend', 'mailgun', 'sendmail'], true);
     }
 
     public function mail(User $user, string $subject, string $message): bool

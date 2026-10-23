@@ -39,20 +39,19 @@ class PortalController extends Controller
 
     public function authenticate(Request $request): RedirectResponse|JsonResponse
     {
-        $request->merge(['email' => is_string($request->input('email')) ? Str::lower(trim($request->input('email'))) : $request->input('email')]);
-        $data = $request->validate(['email' => ['required', 'string', 'email', 'max:255'], 'password' => ['required', 'string', 'max:255']]);
-        $user = User::where('email', $data['email'])->where('is_active', true)->first();
-        $account = $user ? DB::table('portal_accounts')->where('user_id', $user->id)->where('status', 'active')->whereNotNull('activated_at')->whereNotNull('phone_verified_at')->first() : null;
-        if (! $account || ! $user || ! Hash::check($data['password'], $user->password)) {
-            app(AccessPolicy::class)->audit(null, 'portal.login.denied');
-            throw ValidationException::withMessages(['email' => 'Email atau kata sandi tidak sesuai.']);
+        $request->merge(['identifier' => $request->input('identifier', $request->input('email'))]);
+        $data = $request->validate(['identifier' => ['required', 'string', 'max:255'], 'password' => ['required', 'string', 'max:4096']]);
+        try {
+            $result = app(\App\Services\AuthenticationSecurity::class)->primary($request, 'cpmi', $data['identifier'], $data['password']);
+        } catch (ValidationException $exception) {
+            if ($request->expectsJson()) {
+                $limited = str_contains($exception->getMessage(), 'Terlalu banyak');
+                return response()->json(['ok' => false, 'code' => $limited ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS', 'message' => $exception->getMessage()], $limited ? 429 : 401);
+            }
+            throw $exception;
         }
-        Auth::login($user);
-        $request->session()->regenerate();
-        DB::table('portal_accounts')->where('id', $account->id)->update(['last_login_at' => now()]);
-        app(AccessPolicy::class)->audit($user, 'portal.login.success');
 
-        return $request->expectsJson() ? response()->json(['ok' => true, 'redirect' => route('portal.home')])->header('Cache-Control', 'private, no-store') : to_route('portal.home');
+        return $request->expectsJson() ? response()->json($result + ['redirect' => $result['next']])->header('Cache-Control', 'private, no-store') : redirect($result['next']);
     }
 
     public function invite(Request $request, Candidate $candidate): RedirectResponse
@@ -124,8 +123,7 @@ class PortalController extends Controller
 
             return $user;
         });
-        Auth::login($user);
-        $request->session()->regenerate();
+        app(\App\Services\AuthenticationSecurity::class)->finish($request, $user, 'cpmi');
 
         return to_route('portal.home');
     }
@@ -343,15 +341,15 @@ class PortalController extends Controller
 
     public function revokeSessions(Request $request): RedirectResponse|JsonResponse
     {
-        DB::table('sessions')->where('user_id', $request->user()->id)->where('id', '!=', $request->session()->getId())->delete();
-        $request->user()->forceFill(['remember_token' => Str::random(60)])->save();
-        app(AccessPolicy::class)->audit($request->user(), 'portal.sessions.revoked');
+        app(\App\Services\AuthenticationSecurity::class)->revokeOtherSessions($request, $request->user());
 
         return $request->expectsJson() ? response()->json(['ok' => true]) : back()->with('success', 'Sesi pada perangkat lain telah dicabut.');
     }
 
     public function logout(Request $request): RedirectResponse
     {
+        app(AccessPolicy::class)->audit($request->user(), 'auth.logout');
+        DB::table('auth_session_records')->where('id', $request->session()->get('security.record'))->update(['revoked_at' => now()]);
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

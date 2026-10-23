@@ -1,0 +1,3 @@
+@extends('layouts.authentication')
+@section('title','Verifikasi ulang')
+@section('content')<h2 id="auth-heading">Verifikasi ulang</h2><p class="auth-subtitle">Lindungi tindakan penting dengan verifikasi terbaru.</p><form method="POST" action="{{ route('auth.confirm') }}" data-auth-form>@csrf<x-auth-input name="password" label="Kata sandi" type="password" autocomplete="current-password" icon="lock"/>@if($audience==='staff')<x-auth-input name="code" label="Kode baru authenticator / pemulihan" autocomplete="one-time-code" icon="shield"/>@endif<button class="auth-submit" type="submit">Verifikasi <x-ui-icon name="arrow"/></button></form><a class="auth-back" href="{{ $audience==='cpmi'?route('portal.home'):route('auth.sessions') }}">← Kembali</a>@endsection

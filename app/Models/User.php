@@ -14,7 +14,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 
 #[Fillable(['name', 'email', 'password', 'crm_role_id', 'is_active', 'whatsapp', 'team_id'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'auth_version'])]
 class User extends Authenticatable
 {
     protected $attributes = ['is_active' => true];
@@ -33,7 +33,17 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'auth_version' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (User $user): void {
+            if ($user->isDirty(['password', 'email', 'crm_role_id', 'is_active'])) {
+                $user->auth_version = ($user->getOriginal('auth_version') ?? 0) + 1;
+            }
+        });
     }
 
     public function hasPermission(string $permission): bool
