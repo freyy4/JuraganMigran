@@ -78,7 +78,63 @@ class CandidateWorkspace
         $portalAccount = DB::table('portal_accounts')->where('candidate_id', $candidate->id)->first(['status', 'activated_at']);
         $mobilityTimeline = $permissions['timeline'] ? DB::table('mobility_cases')->whereIn('application_id', $historyIds)->latest('id')->limit(10)->get(['id', 'code', 'purpose', 'status', 'created_at']) : collect();
 
-        return compact('candidate', 'permissions', 'canEdit', 'canClose', 'applications', 'current', 'leadRows', 'timeline', 'activityCounts', 'healthSummary', 'documentSummary', 'preferences', 'targetCountry', 'portalAccount', 'mobilityTimeline')
+        $dashboard = $this->dashboard($request, $candidate, $current, $leadRows, $permissions, $preferences, $targetCountry, $documentSummary);
+
+        return $dashboard + compact('candidate', 'permissions', 'canEdit', 'canClose', 'applications', 'current', 'leadRows', 'timeline', 'activityCounts', 'healthSummary', 'documentSummary', 'preferences', 'targetCountry', 'portalAccount', 'mobilityTimeline')
             + ['completion' => app(CrmWorkspace::class)->completeness($candidate), 'nextFollowup' => $leadRows->whereNotNull('next_followup_at')->sortBy('next_followup_at')->first()?->next_followup_at];
     }
+    private function dashboard(Request $request, Candidate $candidate, ?Application $current, \Illuminate\Support\Collection $leads, array $permissions, array $preferences, ?string $targetCountry, \Illuminate\Support\Collection $documentSummary): array
+    {
+        $policy = app(AccessPolicy::class);
+        $canCommunicate = $permissions['contact'] && $this->allowed($request, $candidate, 'crm.conversation.reply');
+        $canPrint = $this->allowed($request, $candidate, 'report.export');
+        $manageableLeadIds = app(ConversationCrm::class)->leads($request, 'crm.followup.manage')->where('candidate_id', $candidate->id)->pluck('id');
+        $nextActions = $permissions['timeline'] ? DB::table('crm_follow_ups')->whereIn('lead_id', $leads->pluck('id'))->where('status', 'SCHEDULED')->orderBy('due_at')->limit(4)->get()->map(function (object $row) use ($manageableLeadIds): object {
+            $row->canManage = $manageableLeadIds->contains($row->lead_id);
+
+            return $row;
+        }) : collect();
+        $documentDashboard = $current ? $documentSummary->first(fn (array $row): bool => $row['application']->id === $current->id) : null;
+        $documentRows = $documentDashboard ? app(DocumentRequirementEngine::class)->rows($current)->take(8) : collect();
+        $canMedical = $current && $policy->applicationIds($request->user(), 'health.mcu.summary.read')->where('applications.id', $current->id)->exists();
+        $medical = $canMedical ? \App\Models\MedicalEvent::where('application_id', $current->id)->where('status', 'completed')->orderByDesc('completed_at')->orderByDesc('id')->first() : null;
+        $canSchedule = $current && $policy->applicationIds($request->user(), 'schedule.read')->where('applications.id', $current->id)->exists();
+        $interview = $canSchedule ? $current->interviews()->orderByDesc('scheduled_at')->orderByDesc('id')->first() : null;
+        $factors = [
+            'documents' => ['label' => 'Dokumen lengkap', 'ready' => $documentDashboard && $documentDashboard['summary']['total'] > 0 && $documentDashboard['summary']['percentage'] === 100, 'visible' => $permissions['documents']],
+            'medical' => ['label' => 'Lolos medical checkup', 'ready' => $medical && $medical->clearance_status === 'fit' && $medical->expires_at && $medical->expires_at->endOfDay()->isFuture(), 'visible' => (bool) $canMedical],
+            'interview' => ['label' => 'Siap wawancara user', 'ready' => $interview && (($interview->status === 'scheduled' && $interview->scheduled_at?->isFuture()) || ($interview->status === 'completed' && $interview->outcome === 'continue')), 'visible' => (bool) $canSchedule],
+            'preferences' => ['label' => 'Preferensi kerja jelas', 'ready' => filled($targetCountry) && filled($preferences['work_sector'] ?? null), 'visible' => true],
+            'departure' => ['label' => 'Kesiapan berangkat', 'ready' => ($preferences['departure_readiness'] ?? null) === 'READY', 'visible' => true],
+        ];
+        $weights = config('candidate-dashboard.readiness_weights');
+        $score = (int) round(100 * collect($factors)->sum(fn (array $factor, string $key): int => $factor['visible'] && $factor['ready'] ? $weights[$key] : 0) / max(1, array_sum($weights)));
+        $readiness = ['score' => $score, 'label' => $score >= 85 ? 'Sangat Siap' : ($score >= 60 ? 'Dalam Persiapan' : 'Perlu Dilengkapi'), 'factors' => $factors, 'restricted' => collect($factors)->contains(fn (array $factor): bool => ! $factor['visible'])];
+        $currentStage = null;
+        foreach (config('candidate-dashboard.stages') as $label => $patterns) {
+            if ($current && collect($patterns)->contains(fn (string $pattern): bool => str_contains(mb_strtolower($current->currentStage?->code.' '.$current->currentStage?->name), $pattern))) {
+                $currentStage = $label;
+                break;
+            }
+        }
+        if ($current?->status === 'completed') {
+            $currentStage = 'Selesai';
+        }
+        if (! $current) {
+            $currentStage = 'Lead';
+        }
+        $processStages = collect(array_keys(config('candidate-dashboard.stages')))->map(fn (string $label): array => ['label' => $label, 'current' => $label === $currentStage]);
+        $source = $leads->first()?->crm_source;
+
+        return compact('canCommunicate', 'canPrint', 'nextActions', 'documentDashboard', 'documentRows', 'readiness', 'processStages', 'source');
+    }
+
+    public static function whatsapp(?string $number): ?string
+    {
+        $digits = preg_replace('/\D/', '', $number ?? '');
+        $digits = str_starts_with($digits, '0') ? '62'.substr($digits, 1) : $digits;
+
+        return preg_match('/^[1-9][0-9]{7,14}$/', $digits) ? 'https://wa.me/'.$digits : null;
+    }
+
 }
