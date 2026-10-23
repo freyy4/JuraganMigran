@@ -101,6 +101,7 @@ class MetaConnectTest extends TestCase
         $this->assertNotSame('server-token', DB::table('meta_auth_sessions')->value('credential'));
         $this->assertSame('server-token', Crypt::decryptString(DB::table('meta_auth_sessions')->value('credential')));
         $this->travel(61)->minutes();
+        $this->actingAs($user);
         $this->getJson(route('meta-connect.state', $start['sessionId']))->assertUnprocessable()->assertJsonPath('code', 'AUTH_SESSION_EXPIRED');
     }
 

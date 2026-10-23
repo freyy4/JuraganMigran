@@ -34,6 +34,8 @@ class CockpitWorkspaceTest extends TestCase
         $this->get(route('cockpit.index', 'system'))->assertOk()->assertViewIs('cockpit.system');
         $role = DB::table('crm_roles')->insertGetId(['name' => 'Super Admin Kustom', 'is_admin' => true, 'active' => true, 'scope_type' => 'TECHNICAL_ONLY', 'permissions' => json_encode(config('governance.roles.super_admin')[2]), 'created_at' => now(), 'updated_at' => now()]);
         $owner->update(['crm_role_id' => $role]);
+        $this->get(route('dashboard'))->assertRedirect(route('login'));
+        $this->actingAs($owner);
         $this->get(route('dashboard'))->assertOk()->assertViewIs('cockpit.menu')->assertViewHas('groups', fn ($groups) => ! collect($groups)->flatMap(fn ($group) => $group['items'])->contains('route', 'candidates.index'));
         $this->get(route('candidates.index'))->assertForbidden();
         $this->actingAs($this->user('cs'))->get(route('dashboard'))->assertOk()->assertDontSee('System Cockpit');

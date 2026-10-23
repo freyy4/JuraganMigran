@@ -294,7 +294,8 @@ class TrackingConfigurationTest extends TestCase
         $this->postJson('/api/funnels/'.$funnel.'/tracking/test', [])->assertForbidden();
         $this->getJson('/api/settings/tracking-destinations')->assertForbidden();
         DB::table('crm_roles')->where('id', $role)->update(['permissions' => json_encode(['funnel.read', 'funnel.manage_draft', 'funnel.tracking.read', 'funnel.tracking.update']), 'scope_type' => 'VACANCY', 'scope_refs' => json_encode([Vacancy::factory()->create()->id])]);
-        $this->getJson('/api/funnels/'.$funnel.'/tracking')->assertNotFound();
+        $this->getJson('/api/funnels/'.$funnel.'/tracking')->assertUnauthorized();
+        $this->actingAs($reader)->getJson('/api/funnels/'.$funnel.'/tracking')->assertNotFound();
         $this->putJson('/api/funnels/'.$funnel.'/tracking', ['draft_token' => str_repeat('a', 64), 'tracking' => ['enabled' => false]])->assertNotFound();
         $this->postJson('/api/funnels/'.$funnel.'/tracking/test', ['draft_token' => str_repeat('a', 64), 'schema' => json_encode($this->schema($destination))])->assertNotFound();
     }

@@ -7,7 +7,9 @@ use App\Models\Candidate;
 use App\Models\CandidateDocument;
 use App\Models\HealthInterview;
 use App\Models\User;
+use App\Rules\SafePassphrase;
 use App\Services\AccessPolicy;
+use App\Services\AuthenticationSecurity;
 use App\Services\CrmWorkspace;
 use App\Services\CsRouter;
 use App\Services\DocumentRequirementEngine;
@@ -17,7 +19,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -42,10 +43,11 @@ class PortalController extends Controller
         $request->merge(['identifier' => $request->input('identifier', $request->input('email'))]);
         $data = $request->validate(['identifier' => ['required', 'string', 'max:255'], 'password' => ['required', 'string', 'max:4096']]);
         try {
-            $result = app(\App\Services\AuthenticationSecurity::class)->primary($request, 'cpmi', $data['identifier'], $data['password']);
+            $result = app(AuthenticationSecurity::class)->primary($request, 'cpmi', $data['identifier'], $data['password']);
         } catch (ValidationException $exception) {
             if ($request->expectsJson()) {
                 $limited = str_contains($exception->getMessage(), 'Terlalu banyak');
+
                 return response()->json(['ok' => false, 'code' => $limited ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS', 'message' => $exception->getMessage()], $limited ? 429 : 401);
             }
             throw $exception;
@@ -97,7 +99,7 @@ class PortalController extends Controller
 
     public function activate(Request $request, string $token): RedirectResponse
     {
-        $data = $request->validate(['password' => ['required', 'string', new \App\Rules\SafePassphrase, 'max:255', 'confirmed'], 'consent' => ['accepted']]);
+        $data = $request->validate(['password' => ['required', 'string', new SafePassphrase, 'max:255', 'confirmed'], 'consent' => ['accepted']]);
         $user = DB::transaction(function () use ($token, $data): User {
             $invitation = $this->validInvitation($token);
             $invitation = DB::table('portal_invitations')->where('id', $invitation->id)->lockForUpdate()->first();
@@ -123,7 +125,7 @@ class PortalController extends Controller
 
             return $user;
         });
-        app(\App\Services\AuthenticationSecurity::class)->finish($request, $user, 'cpmi');
+        app(AuthenticationSecurity::class)->finish($request, $user, 'cpmi');
 
         return to_route('portal.home');
     }
@@ -341,7 +343,7 @@ class PortalController extends Controller
 
     public function revokeSessions(Request $request): RedirectResponse|JsonResponse
     {
-        app(\App\Services\AuthenticationSecurity::class)->revokeOtherSessions($request, $request->user());
+        app(AuthenticationSecurity::class)->revokeOtherSessions($request, $request->user());
 
         return $request->expectsJson() ? response()->json(['ok' => true]) : back()->with('success', 'Sesi pada perangkat lain telah dicabut.');
     }

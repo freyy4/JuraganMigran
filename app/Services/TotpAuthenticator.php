@@ -31,9 +31,9 @@ class TotpAuthenticator
             $key .= chr(bindec(substr($bits, $i, 8)));
         }
         $counter = intdiv($timestamp, 30);
-        $hash = hash_hmac('sha1', pack('N2', intdiv($counter, 4294967296), $counter & 0xffffffff), $key, true);
+        $hash = hash_hmac('sha1', pack('N2', intdiv($counter, 4294967296), $counter & 0xFFFFFFFF), $key, true);
         $offset = ord($hash[19]) & 15;
-        $binary = unpack('N', substr($hash, $offset, 4))[1] & 0x7fffffff;
+        $binary = unpack('N', substr($hash, $offset, 4))[1] & 0x7FFFFFFF;
 
         return str_pad((string) ($binary % (10 ** $digits)), $digits, '0', STR_PAD_LEFT);
     }

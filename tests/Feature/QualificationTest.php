@@ -43,6 +43,7 @@ class QualificationTest extends TestCase
         $this->assertNull($application->qualificationResults()->where('vacancy_requirement_id', $second->id)->first()->checked_at);
         $this->get(route('qualifications.show', $other))->assertOk()->assertViewHas('progress', 0);
         $this->travel(1)->hours();
+        $this->actingAs(auth()->user());
         $this->put(route('qualifications.update', $application), $data)->assertSessionHasNoErrors();
         $this->assertTrue($result->fresh()->checked_at->equalTo($result->checked_at));
         $this->assertDatabaseCount('application_qualification_results', 2);

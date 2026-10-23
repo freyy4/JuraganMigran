@@ -52,6 +52,9 @@ class LoginPortalSecurityTest extends TestCase
         $this->postJson(route('auth.staff.login'), ['email' => $user->email, 'password' => 'password'])->assertOk()->assertJsonPath('mfaRequired', true)->assertJsonPath('enrollmentRequired', true);
         $this->assertGuest();
         $this->get(route('candidates.index'))->assertRedirect(route('login'));
+        if ($directory = getenv('AUTH_QA_FIXTURES')) {
+            file_put_contents($directory.'/mfa.html', $this->get(route('auth.challenge'))->assertOk()->getContent());
+        }
         $this->completeStaffMfa($user)->assertRedirect(route('auth.recovery-codes'));
         $this->assertAuthenticatedAs($user);
         $this->assertNotSame($oldSession, session()->getId());
@@ -169,6 +172,14 @@ class LoginPortalSecurityTest extends TestCase
         $this->actingAs($user);
         $user->update(['crm_role_id' => DB::table('crm_roles')->where('code', 'cs')->value('id')]);
         $this->getJson(route('candidates.index'))->assertUnauthorized();
+    }
+
+    public function test_expired_authenticated_cookie_does_not_block_public_pages(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user)->withSession(['security.last_active_at' => now()->subHours(2)->timestamp]);
+        $this->get(route('privacy'))->assertOk();
+        $this->assertGuest();
     }
 
     public function test_high_risk_actions_need_recent_password_and_mfa_reauthentication(): void

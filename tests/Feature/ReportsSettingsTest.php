@@ -104,6 +104,7 @@ class ReportsSettingsTest extends TestCase
         $this->assertSame(app(AccessPolicy::class)->expand(['Laporan', 'CRM']), json_decode(DB::table('crm_roles')->where('id', $role->id)->value('permissions'), true));
         $adminRole = $this->role([], true);
         $this->admin->update(['crm_role_id' => $adminRole]);
+        $this->actingAs($this->admin);
         $this->put(route('settings.roles.update', $adminRole), ['name' => 'Administrator', 'permissions' => [], 'is_admin' => 0])->assertSessionHasErrors('is_admin');
         $this->assertTrue((bool) DB::table('crm_roles')->where('id', $adminRole)->value('is_admin'));
     }
@@ -145,7 +146,10 @@ class ReportsSettingsTest extends TestCase
     {
         $user = User::factory()->create(['crm_role_id' => $this->role(['Laporan'])]);
         auth()->logout();
-        $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])->assertRedirect(route('reports.pipeline.index'));
+        $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])->assertRedirect(route('auth.challenge'));
+        $this->assertGuest();
+        $this->completeStaffMfa($user);
+        $this->assertSame(route('reports.pipeline.index'), session('auth.after_recovery'));
         $this->get(route('login'))->assertRedirect(route('reports.pipeline.index'));
         $this->get('/')->assertOk()->assertSee('Lowongan Kerja');
     }

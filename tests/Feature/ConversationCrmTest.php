@@ -404,6 +404,8 @@ class ConversationCrmTest extends TestCase
         $migration = require database_path('migrations/2026_10_17_105237_grant_conversation_permissions_to_legacy_owner.php');
         $migration->up();
         $migration->up();
+        $this->get(route('crm.settings'))->assertRedirect(route('login'));
+        $this->actingAs($owner);
         $this->get(route('crm.settings'))->assertOk()->assertSee('Channel WhatsApp');
         $this->assertTrue($owner->hasPermission('crm.whatsapp.manage'));
         $this->assertSame($before, DB::table('crm_roles')->where('code', 'cs')->value('permissions'));

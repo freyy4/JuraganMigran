@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Services\AuthenticationSecurity;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
@@ -25,11 +27,11 @@ class LoginRequest extends FormRequest
     public function authenticate(): array
     {
         try {
-            return app(\App\Services\AuthenticationSecurity::class)->primary($this, 'staff', $this->string('email')->toString(), $this->string('password')->toString());
+            return app(AuthenticationSecurity::class)->primary($this, 'staff', $this->string('email')->toString(), $this->string('password')->toString());
         } catch (ValidationException $exception) {
             if ($this->expectsJson()) {
                 $limited = str_contains($exception->getMessage(), 'Terlalu banyak');
-                throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['ok' => false, 'code' => $limited ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS', 'message' => $exception->getMessage()], $limited ? 429 : 401));
+                throw new HttpResponseException(response()->json(['ok' => false, 'code' => $limited ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS', 'message' => $exception->getMessage()], $limited ? 429 : 401));
             }
             throw $exception;
         }

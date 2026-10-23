@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AccountRecoveryController;
 use App\Http\Controllers\AcquisitionController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthenticatedSessionController;
+use App\Http\Controllers\AuthenticationSecurityController;
 use App\Http\Controllers\BlockerController;
 use App\Http\Controllers\CandidateApplicationController;
 use App\Http\Controllers\CandidateController;
@@ -78,23 +80,22 @@ Route::middleware('guest')->group(function (): void {
     Route::post('login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
     Route::post('api/auth/staff/login', [AuthenticatedSessionController::class, 'store'])->name('auth.staff.login');
 });
-Route::get('auth/challenge', [\App\Http\Controllers\AuthenticationSecurityController::class, 'challenge'])->name('auth.challenge');
-Route::post('auth/challenge', [\App\Http\Controllers\AuthenticationSecurityController::class, 'verify'])->block(10, 10)->name('auth.challenge.verify');
-Route::post('api/auth/staff/mfa/verify', [\App\Http\Controllers\AuthenticationSecurityController::class, 'verify'])->block(10, 10)->name('auth.staff.mfa.verify');
-Route::post('auth/cancel', [\App\Http\Controllers\AuthenticationSecurityController::class, 'cancel'])->name('auth.cancel');
+Route::get('auth/challenge', [AuthenticationSecurityController::class, 'challenge'])->name('auth.challenge');
+Route::post('auth/challenge', [AuthenticationSecurityController::class, 'verify'])->block(10, 10)->name('auth.challenge.verify');
+Route::post('api/auth/staff/mfa/verify', [AuthenticationSecurityController::class, 'verify'])->block(10, 10)->name('auth.staff.mfa.verify');
+Route::post('auth/cancel', [AuthenticationSecurityController::class, 'cancel'])->name('auth.cancel');
 Route::middleware('auth')->group(function (): void {
-    Route::get('auth/recovery-codes', [\App\Http\Controllers\AuthenticationSecurityController::class, 'recoveryCodes'])->name('auth.recovery-codes');
-    Route::get('auth/sessions', [\App\Http\Controllers\AuthenticationSecurityController::class, 'sessions'])->name('auth.sessions');
-    Route::post('auth/sessions/revoke', [\App\Http\Controllers\AuthenticationSecurityController::class, 'revoke'])->name('auth.sessions.revoke');
-    Route::post('security/users/{user}/revoke-sessions', [\App\Http\Controllers\AuthenticationSecurityController::class, 'revokeUser'])->name('security.users.revoke');
-    Route::get('auth/confirm', [\App\Http\Controllers\AuthenticationSecurityController::class, 'reauthenticate'])->name('auth.reauthenticate');
-    Route::post('auth/confirm', [\App\Http\Controllers\AuthenticationSecurityController::class, 'confirm'])->name('auth.confirm');
+    Route::get('auth/recovery-codes', [AuthenticationSecurityController::class, 'recoveryCodes'])->name('auth.recovery-codes');
+    Route::get('auth/sessions', [AuthenticationSecurityController::class, 'sessions'])->name('auth.sessions');
+    Route::post('auth/sessions/revoke', [AuthenticationSecurityController::class, 'revoke'])->name('auth.sessions.revoke');
+    Route::post('security/users/{user}/revoke-sessions', [AuthenticationSecurityController::class, 'revokeUser'])->name('security.users.revoke');
+    Route::get('auth/confirm', [AuthenticationSecurityController::class, 'reauthenticate'])->name('auth.reauthenticate');
+    Route::post('auth/confirm', [AuthenticationSecurityController::class, 'confirm'])->name('auth.confirm');
 });
-Route::get('forgot-password', [\App\Http\Controllers\AccountRecoveryController::class, 'create'])->name('password.request');
-Route::post('forgot-password', [\App\Http\Controllers\AccountRecoveryController::class, 'store'])->name('password.email');
-Route::get('reset-password/{token}', [\App\Http\Controllers\AccountRecoveryController::class, 'edit'])->name('password.reset');
-Route::post('reset-password', [\App\Http\Controllers\AccountRecoveryController::class, 'update'])->block(10, 10)->name('password.update');
-
+Route::get('forgot-password', [AccountRecoveryController::class, 'create'])->name('password.request');
+Route::post('forgot-password', [AccountRecoveryController::class, 'store'])->name('password.email');
+Route::get('reset-password/{token}', [AccountRecoveryController::class, 'edit'])->name('password.reset');
+Route::post('reset-password', [AccountRecoveryController::class, 'update'])->block(10, 10)->name('password.update');
 
 Route::get('funnel-media/{funnel}/{file}', [FunnelController::class, 'media'])->whereNumber('funnel')->where('file', '[a-f0-9-]{36}\\.(jpg|png|webp)')->name('funnel-media.show');
 

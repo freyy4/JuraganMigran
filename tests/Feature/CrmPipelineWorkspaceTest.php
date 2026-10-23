@@ -138,6 +138,7 @@ class CrmPipelineWorkspaceTest extends TestCase
         $this->assertStringContainsString('inlineStr', $zip->getFromName('xl/worksheets/sheet1.xml'));
         $zip->close();
         $this->travel(25)->hours();
+        $this->actingAs($user);
         $this->get(URL::temporarySignedRoute('crm.export-download', now()->addMinutes(5), ['job' => $job]))->assertStatus(410);
     }
 

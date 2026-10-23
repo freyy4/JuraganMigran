@@ -144,6 +144,7 @@ class HolidayMobilityTest extends TestCase
         $this->assertDatabaseCount('operations_alerts', 1);
         $pass = app(MobilityService::class)->issue($leg->id, now()->addHour(), $user->id);
         $this->travel(2)->hours();
+        $this->actingAs($user);
         $token = Crypt::decryptString($pass->encrypted_token);
         $this->getJson(route('qr.public', $token))->assertJsonPath('status', 'EXPIRED')->assertJsonMissingPath('name');
         $this->postJson(route('mobility.check-in', $token))->assertStatus(409);

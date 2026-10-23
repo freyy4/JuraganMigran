@@ -45,6 +45,7 @@ class BlockerTest extends TestCase
         $this->assertTrue($blocker->fresh()->resolved_at->equalTo(now()));
         $resolvedAt = $blocker->fresh()->resolved_at;
         $this->travel(1)->hours();
+        $this->actingAs(auth()->user());
         $this->patch(route('blockers.resolve', $blocker))->assertSessionHasNoErrors();
         $this->assertTrue($resolvedAt->equalTo($blocker->fresh()->resolved_at));
         $this->assertFalse($blocker->fresh()->isOverdue());

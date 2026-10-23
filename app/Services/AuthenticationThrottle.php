@@ -26,7 +26,6 @@ class AuthenticationThrottle
         }
         foreach ($this->keys($request, $identifier, $purpose) as $type => $key) {
             $attempts = RateLimiter::attempts($key);
-            $backoff = min(config('security.throttle.backoff_max'), 2 ** max(0, $attempts - config('security.throttle.backoff_after')));
             if (RateLimiter::tooManyAttempts($key, config('security.throttle.'.$type)) || ($attempts >= config('security.throttle.backoff_after') && RateLimiter::tooManyAttempts($key.':delay', 1))) {
                 app(AccessPolicy::class)->audit(null, 'auth.attempt.throttled', ['purpose' => $purpose]);
                 throw ValidationException::withMessages([$field => self::MESSAGE]);

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticationBoundary;
 use App\Http\Middleware\NormalizeMoneyInputs;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,7 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->preventRequestForgery(except: ['api/webhooks/whatsapp', 'api/webhooks/whatsapp-qr']);
-        $middleware->web(append: [\App\Http\Middleware\AuthenticationBoundary::class, NormalizeMoneyInputs::class]);
+        $middleware->web(append: [AuthenticationBoundary::class, NormalizeMoneyInputs::class]);
         $middleware->redirectGuestsTo(fn (Request $request) => route($request->is('portal/*', 'api/portal/*') ? 'portal.login' : 'login'));
         $middleware->redirectUsersTo(fn (Request $request) => $request->user()->crmHomeUrl());
     })

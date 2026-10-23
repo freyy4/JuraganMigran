@@ -42,6 +42,7 @@ class TaskTest extends TestCase
         $this->assertNotNull($completedAt);
         $this->assertSame('completed', $task->fresh()->status);
         $this->travel(1)->hours();
+        $this->actingAs(auth()->user());
         $this->patch(route('tasks.complete', $task))->assertSessionHasNoErrors();
         $this->assertTrue($completedAt->equalTo($task->fresh()->completed_at));
         $this->put(route('tasks.update', $task), $data)->assertSessionHasNoErrors();

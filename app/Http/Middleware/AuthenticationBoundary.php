@@ -34,6 +34,11 @@ class AuthenticationBoundary
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
                 app(AccessPolicy::class)->audit($user, 'auth.session.expired');
+                $middleware = $request->route()?->gatherMiddleware() ?? [];
+                $protected = collect($middleware)->contains(fn ($name) => $name === 'auth' || str_starts_with($name, 'auth:') || in_array($name, [CrmAccess::class, PortalAccess::class, \Illuminate\Auth\Middleware\Authenticate::class], true));
+                if (! $protected) {
+                    return $next($request);
+                }
 
                 return $request->expectsJson() ? response()->json(['ok' => false, 'code' => 'SESSION_EXPIRED', 'message' => 'Sesi berakhir. Silakan masuk kembali.'], 401) : redirect()->route($portal ? 'portal.login' : 'login')->with('success', 'Silakan masuk kembali untuk memverifikasi keamanan sesi.');
             }
@@ -56,7 +61,7 @@ class AuthenticationBoundary
         if ($request->secure()) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000');
         }
-        $login = $request->routeIs('login*', 'portal.login*', 'auth.*', 'password.*') || $request->is('api/auth/*');
+        $login = $request->routeIs('login*', 'portal.login*', 'portal.invitation', 'portal.activate', 'auth.*', 'password.*') || $request->is('api/auth/*');
         if ($login) {
             $response->headers->set('Referrer-Policy', 'no-referrer');
         }
