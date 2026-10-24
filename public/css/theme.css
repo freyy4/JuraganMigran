@@ -130,3 +130,4 @@ html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color
 html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color.purple{background:#533c7f}
 
 html[data-theme=dark] .site-eyebrow{background:#203d5c;color:#badcff}html[data-theme=dark] .portal-body .current-stage{background:#203650;color:#d9e8fb;border-color:#3c5574}
+html[data-theme=dark] .profile-steps{background:#182338;color:#dce7f5;border-color:#334155}html[data-theme=dark] .profile-steps a{color:#b9d6ff}html[data-theme=dark] .profile-steps a[aria-current=step]{background:#243d60;color:#d6e7ff}

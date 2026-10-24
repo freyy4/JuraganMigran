@@ -23,6 +23,7 @@ class SyncTrustCommitmentProtocol extends Command
         if ($this->option('dry-run')) {
             return self::SUCCESS;
         }
+        $query = Application::withoutGlobalScopes()->whereNull('deleted_at')->whereNotIn('status', ['closed', 'cancelled', 'withdrawn', 'rejected', 'completed', 'departed']);
         $query->orderBy('id')->chunkById(100, function ($applications) use ($protocol): void {
             foreach ($applications as $application) {
                 $protocol->initialize($application, true);

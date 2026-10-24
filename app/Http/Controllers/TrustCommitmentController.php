@@ -45,7 +45,7 @@ class TrustCommitmentController extends Controller
         $this->protocol->authorize($request->user(), $application, 'process.read');
         abort_unless($this->protocol->available(), 404);
         $run = DB::table('protocol_runs')->where('application_id', $application->id)->first();
-        $definition = $run ? json_decode($run->definition, true) : $this->protocol->policy();
+        $definition = $run ? $this->protocol->definition($run) : $this->protocol->policy();
         $stage = $run ? DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->first() : null;
         $gate = $run ? $this->protocol->gate($application, $run) : null;
         $can = fn (string $permission): bool => app(AccessPolicy::class)->applicationIds($request->user(), $permission)->where('applications.id', $application->id)->exists();
@@ -114,7 +114,7 @@ class TrustCommitmentController extends Controller
             $settings = DB::table('protocol_settings')->where('id', 1)->lockForUpdate()->firstOrFail();
             abort_unless($settings->version === $data['version'], 409, 'Pengaturan telah berubah.');
             $policy = json_decode($settings->policy, true);
-            abort_unless(array_keys($data['stages']) === array_keys($policy['stages']), 422);
+            abort_unless(array_diff_key($data['stages'], $policy['stages']) === [] && count($data['stages']) === count($policy['stages']), 422);
             foreach ($data['stages'] as $key => $values) {
                 $policy['stages'][$key] = [...$policy['stages'][$key], ...$values, 'hours' => (int) $values['hours']];
             }

@@ -95,6 +95,7 @@ class TrainingEnrollmentController extends Controller
             $application = Application::withTrashed()->findOrFail($data['application_id']);
             if (in_array($data['status'], ['ongoing', 'completed'], true)) {
                 app(TrustCommitmentProtocol::class)->authorize($request->user(), $application, 'protocol.placement');
+                app(\App\Services\TrustCommitmentProtocol::class)->assertAdmissionAllowed($application);
             }
             if ($application->trashed() && ! $sameApplication) {
                 throw ValidationException::withMessages(['application_id' => 'Lamaran sudah dihapus.']);

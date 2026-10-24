@@ -103,6 +103,7 @@ class CareJourneyController extends Controller
             $data['policy']['marital_documents'] = array_map(fn ($id): ?int => filled($id) ? (int) $id : null, $data['policy']['marital_documents'] ?? []);
             $data['policy']['teto_document_type_ids'] = array_map('intval', $data['policy']['teto_document_type_ids'] ?? []);
         }
+        $data['policy']['stage_order'] = array_column($data['stages'], 'key');
         DB::transaction(function () use ($country, $data): void {
             $template = DB::table('care_journey_templates')->where('country_code', strtoupper($country))->lockForUpdate()->first() ?? abort(404);
             abort_unless($template->version === $data['version'], 409, 'Template telah berubah.');

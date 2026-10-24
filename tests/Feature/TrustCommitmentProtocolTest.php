@@ -173,7 +173,7 @@ class TrustCommitmentProtocolTest extends TestCase
         Storage::fake('documents');
         $app = $this->setupApplication();
         $type = DocumentType::factory()->create();
-        DB::table('care_journey_templates')->where('country_code', 'DEFAULT')->update(['policy' => json_encode(['consent_required' => true, 'consent_document_type_id' => $type->id])]);
+        DB::table('care_journey_templates')->where('id', app(\App\Services\CareJourney::class)->template($app)->id)->update(['policy' => json_encode(['consent_required' => true, 'consent_document_type_id' => $type->id])]);
         $this->moveFixture($app, 'family');
         $this->post(route('protocol.action', $app), $this->payload($app, 'advance'))->assertSessionHasErrors('gate');
         $contact = $app->candidate->contacts()->create(['name' => 'Wali uji', 'relationship' => 'Orang tua']);
@@ -389,6 +389,36 @@ class TrustCommitmentProtocolTest extends TestCase
         $this->assertDatabaseCount('protocol_golden_windows', 1);
         $this->assertSame(1, DB::table('tasks')->where('status', 'open')->count());
         $this->assertSame(1, DB::table('protocol_stage_instances')->whereNull('exited_at')->count());
+    }
+
+    public function test_json_object_key_normalization_cannot_reorder_the_core_protocol(): void
+    {
+        $app = $this->setupApplication();
+        $run = DB::table('protocol_runs')->where('application_id', $app->id)->first();
+        $policy = app(TrustCommitmentProtocol::class)->policy();
+        $policy['stages'] = array_reverse($policy['stages'], true);
+        DB::table('protocol_settings')->where('id', 1)->update(['policy' => json_encode($policy)]);
+        DB::table('protocol_runs')->where('id', $run->id)->update(['definition' => json_encode($policy)]);
+        $this->assertSame(array_keys(config('protocol.stages')), array_keys(app(TrustCommitmentProtocol::class)->policy()['stages']));
+        $this->get(route('protocol.show', $app))->assertOk()->assertViewHas('definition', fn ($definition) => array_keys($definition['stages']) === array_keys(config('protocol.stages')));
+        $this->act($app, 'outcome', ['interest' => 'PROGRAM', 'inbound_confirmed' => 1]);
+        $this->act($app, 'advance');
+        $this->assertSame('trust', $this->stage($app));
+    }
+
+    public function test_early_admission_and_expired_fit_cannot_bypass_enforced_gates(): void
+    {
+        $app = $this->setupApplication();
+        $batch = \App\Models\TrainingBatch::factory()->create();
+        $this->post(route('training.store'), ['application_id' => $app->id, 'batch_id' => $batch->id, 'status' => 'ongoing', 'joined_at' => now('Asia/Jakarta')->toDateString()])->assertSessionHasErrors('application_id');
+        $this->moveFixture($app, 'waiting');
+        $medical = MedicalEvent::factory()->create(['application_id' => $app->id, 'status' => 'completed', 'completed_at' => now(), 'clearance_status' => 'fit', 'expires_at' => now('Asia/Jakarta')->toDateString()]);
+        $this->assertSame('golden', $this->stage($app));
+        $this->travel(2)->days();
+        $this->artisan('care:monitor')->assertSuccessful();
+        $this->assertSame('result', $this->stage($app));
+        $this->assertDatabaseHas('protocol_golden_windows', ['status' => 'MEDICAL_REVIEW']);
+        $this->assertSame(0, DB::table('training_enrollments')->count());
     }
 
 }

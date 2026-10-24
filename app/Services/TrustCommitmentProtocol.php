@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Application;
 use App\Models\ApplicationBlocker;
+use App\Models\Candidate;
 use App\Models\CandidateDocument;
 use App\Models\Interview;
 use App\Models\MedicalEvent;
@@ -26,7 +27,18 @@ class TrustCommitmentProtocol
 
     public function policy(): array
     {
-        return json_decode(DB::table('protocol_settings')->where('id', 1)->value('policy'), true);
+        return $this->orderedPolicy(json_decode(DB::table('protocol_settings')->where('id', 1)->value('policy'), true));
+    }
+
+    /** JSON objects have no ordering guarantee, including when persisted by MySQL. */
+    private function orderedPolicy(array $policy): array
+    {
+        $stored = $policy['stages'];
+        $policy['stages'] = [];
+        foreach (config('protocol.stages') as $key => $fallback) {
+            $policy['stages'][$key] = $stored[$key] ?? $fallback;
+        }
+        return $policy;
     }
 
     public function authorize(User $actor, Application $application, string $permission): void
@@ -41,12 +53,13 @@ class TrustCommitmentProtocol
             if ($run = DB::table('protocol_runs')->where('application_id', $application->id)->first()) {
                 return $run;
             }
+            $application->setRelation('candidate', Candidate::withoutGlobalScopes()->with('person')->findOrFail($application->candidate_id));
             $policy = $this->policy();
             $stage = 'opt_in';
             if ($legacy) {
                 $stage = match (true) {
                     $application->trainingEnrollments()->whereIn('status', ['ongoing', 'completed'])->exists() => 'country',
-                    $application->medicalEvents()->where('status', 'completed')->where('clearance_status', 'fit')->exists() => 'golden',
+                    $application->medicalEvents()->where('status', 'completed')->where('clearance_status', 'fit')->where(fn ($q) => $q->whereNull('expires_at')->orWhereDate('expires_at', '>=', now('Asia/Jakarta')->toDateString()))->exists() => 'golden',
                     $application->medicalEvents()->where('status', 'completed')->exists() => 'result',
                     $application->medicalEvents()->where('status', 'scheduled')->exists() => 'custody_mcu',
                     $application->interviews()->where('status', 'completed')->where('outcome', 'continue')->exists() => 'family',
@@ -64,9 +77,9 @@ class TrustCommitmentProtocol
         });
     }
 
-    private function definition(object $run): array
+    public function definition(object $run): array
     {
-        return json_decode($run->definition, true);
+        return $this->orderedPolicy(json_decode($run->definition, true));
     }
 
     private function openStage(Application $application, object $run, string $stage): void
@@ -110,7 +123,7 @@ class TrustCommitmentProtocol
     private function event(Application $application, string $key, string $type, array $payload, string $permission = 'candidate.read.timeline'): void
     {
         $exists = DB::table('care_events')->where('source_key', $key)->exists();
-        app(CareJourney::class)->event($application->candidate, $key, $type, $payload, $permission, auth()->user(), $application->id, true, $this->careStage($type));
+        app(CareJourney::class)->event(Candidate::withoutGlobalScopes()->findOrFail($application->candidate_id), $key, $type, $payload, $permission, auth()->user(), $application->id, true, $this->careStage($type));
         if (! $exists && in_array($type, ['APPOINTMENT_CONFIRMED', 'APPOINTMENT_REMINDER', 'MCU_FIT', 'LPK_ADMITTED'], true) && DB::table('portal_accounts')->where('candidate_id', $application->candidate_id)->where('status', 'active')->where('in_app_notifications', true)->exists()) {
             DB::table('portal_notifications')->insert(['candidate_id' => $application->candidate_id, 'category' => 'PROCESS_UPDATE', 'title' => match ($type) { 'APPOINTMENT_CONFIRMED' => 'Kunjungan Anda diperbarui', 'APPOINTMENT_REMINDER' => 'Pengingat kunjungan kantor', 'MCU_FIT' => 'Persiapan masuk LPK', default => 'Masuk LPK terkonfirmasi' }, 'body_safe' => 'Periksa jadwal dan langkah berikutnya di portal. Hubungi CS jika membutuhkan bantuan.', 'deep_link' => '/portal/schedules', 'created_at' => now(), 'updated_at' => now()]);
         }
@@ -152,14 +165,19 @@ class TrustCommitmentProtocol
             'appointment' => [$appointment && $appointment->status === 'CONFIRMED' && $appointment->medical_event_id !== null, 'Konfirmasi paket kunjungan dengan MCU, PIC, lokasi dan transport.'],
             'custody_mcu' => [$appointment && $appointment->status === 'ATTENDED' && $medical && $this->originalsReady($application), 'Konfirmasi hadir, MCU terhubung dan custody semua dokumen asli wajib.'],
             'waiting' => [$medical?->status === 'completed' && filled($medical?->clearance_status), 'Menunggu hasil resmi dari petugas medis berwenang.'],
-            'result' => [$medical?->status === 'completed' && $medical?->clearance_status === 'fit', 'Hanya hasil resmi FIT dapat menuju Golden Window; UNFIT/PENDING/RETEST perlu tindak lanjut.'],
-            'golden' => [DB::table('protocol_golden_windows')->where('run_id', $run->id)->where('status', 'OPEN')->exists() && filled($this->lastAction($run, 'golden')['handover'] ?? null) && $application->trainingEnrollments()->whereIn('status', ['scheduled', 'ongoing', 'completed'])->exists(), 'Tentukan batch LPK aktual, transport dan handover.'],
+            'result' => [$this->validFit($medical), 'Hanya hasil resmi FIT dapat menuju Golden Window; UNFIT/PENDING/RETEST perlu tindak lanjut.'],
+            'golden' => [$this->validFit($medical) && DB::table('protocol_golden_windows')->where('run_id', $run->id)->where('status', 'OPEN')->exists() && filled($this->lastAction($run, 'golden')['handover'] ?? null) && $application->trainingEnrollments()->whereIn('status', ['scheduled', 'ongoing', 'completed'])->exists(), 'Tentukan batch LPK aktual, transport dan handover.'],
             'onboarding' => [$application->trainingEnrollments()->whereIn('status', ['ongoing', 'completed'])->whereNotNull('joined_at')->exists(), 'Konfirmasi admission aktual melalui pelatihan / check-in LPK.'],
             'country' => [false, 'Lanjutkan proses negara melalui template workflow penempatan yang berlaku.'],
         };
         $blocked = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->where('blocker_status', 'BLOCKED')->exists() || $application->blockers()->where('priority', 'urgent')->whereNotIn('status', [...ApplicationBlocker::RESOLVED, 'closed', 'cancelled'])->exists();
 
         return ['passed' => (bool) $result[0] && ! $blocked, 'reason' => $blocked ? 'Selesaikan kendala aktif terlebih dahulu. '.$result[1] : $result[1], 'blocked' => $blocked];
+    }
+
+    private function validFit(?MedicalEvent $medical): bool
+    {
+        return $medical && $medical->status === 'completed' && $medical->clearance_status === 'fit' && (! $medical->expires_at || $medical->expires_at->toDateString() >= now('Asia/Jakarta')->toDateString());
     }
 
     private function familyReady(Application $application, ?object $consent): bool
@@ -475,20 +493,19 @@ class TrustCommitmentProtocol
                 return;
             }
             $golden = DB::table('protocol_golden_windows')->where('run_id', $run->id)->first();
-            if ($medical->status !== 'completed' || $medical->clearance_status !== 'fit') {
+            if (! $this->validFit($medical)) {
                 if ($golden && $golden->status === 'OPEN') {
                     DB::table('protocol_golden_windows')->where('id', $golden->id)->update(['status' => 'MEDICAL_REVIEW', 'updated_at' => now()]);
                     Task::withoutGlobalScopes()->whereKey($golden->task_id)->update(['status' => 'cancelled']);
-                    if (in_array($run->stage, ['golden', 'onboarding'], true)) {
-                        $current = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->first();
-                        DB::table('protocol_stage_instances')->where('id', $current->id)->update(['exited_at' => now()]);
-                        Task::withoutGlobalScopes()->whereKey($current->task_id)->update(['status' => 'cancelled']);
-                        DB::table('protocol_runs')->where('id', $run->id)->update(['stage' => 'result', 'version' => $run->version + 1, 'updated_at' => now()]);
-                        $this->openStage($application, $run, 'result');
-                        $this->event($application, 'protocol-medical-review:'.$run->id.':'.$run->version, 'PROTOCOL_MEDICAL_REVIEW', ['title' => 'Hasil resmi berubah: koordinasi medis diperlukan'], 'health.mcu.summary.read');
-                    }
                 }
-
+                if (in_array($run->stage, ['golden', 'onboarding'], true)) {
+                    $current = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->first();
+                    DB::table('protocol_stage_instances')->where('id', $current->id)->update(['exited_at' => now()]);
+                    Task::withoutGlobalScopes()->whereKey($current->task_id)->update(['status' => 'cancelled']);
+                    DB::table('protocol_runs')->where('id', $run->id)->update(['stage' => 'result', 'version' => $run->version + 1, 'updated_at' => now()]);
+                    $this->openStage($application, $run, 'result');
+                    $this->event($application, 'protocol-medical-review:'.$run->id.':'.$run->version, 'PROTOCOL_MEDICAL_REVIEW', ['title' => 'Hasil resmi berubah atau kedaluwarsa: koordinasi medis diperlukan'], 'health.mcu.summary.read');
+                }
                 return;
             }
             if ($golden && in_array($golden->status, ['OPEN', 'CLOSED'], true)) {
@@ -559,6 +576,17 @@ class TrustCommitmentProtocol
         }
     }
 
+    public function assertAdmissionAllowed(Application $application): void
+    {
+        if (! $this->available()) {
+            return;
+        }
+        $run = DB::table('protocol_runs')->where('application_id', $application->id)->first();
+        if ($run && $run->mode === 'ENFORCED' && (! in_array($run->stage, ['golden', 'onboarding', 'country'], true) || ! $this->validFit($application->medicalEvents()->latest('id')->first()) || blank($this->lastAction($run, 'golden')['handover'] ?? null))) {
+            throw ValidationException::withMessages(['application_id' => 'Selesaikan gate, FIT yang masih berlaku dan rencana handover sebelum admission LPK.']);
+        }
+    }
+
     public function assertMcuAllowed(Application $application, bool $result = false): void
     {
         if (! $this->available()) {
@@ -583,6 +611,13 @@ class TrustCommitmentProtocol
                         return;
                     }
                     $run = DB::table('protocol_runs')->where('id', $item->id)->lockForUpdate()->firstOrFail();
+                    if (in_array($run->stage, ['golden', 'onboarding'], true)) {
+                        $medical = MedicalEvent::withoutGlobalScopes()->where('application_id', $application->id)->latest('id')->first();
+                        if ($medical && ! $this->validFit($medical)) {
+                            $this->medicalSaved($medical);
+                            $run = DB::table('protocol_runs')->find($run->id);
+                        }
+                    }
                     $stage = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->firstOrFail();
                     $definition = $this->definition($run)['stages'][$stage->stage];
                     $profile = $stage->owner_id ? DB::table('protocol_routing_profiles')->where('user_id', $stage->owner_id)->first() : null;

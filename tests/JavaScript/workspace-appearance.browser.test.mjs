@@ -91,7 +91,7 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
                     return [...new Set(issues)].slice(0,12);
                 })()`);
                 if(issues.length)failures.push({page:page.key,theme,width,issues});
-                if(['form-candidates','form-settings.roles','crm-settings','menu-10-0','menu-7-2','menu-1-2','candidate-detail','care-journey'].includes(page.key)){
+                if(['form-candidates','form-settings.roles','crm-settings','menu-10-0','menu-7-2','menu-1-2','candidate-detail','care-journey','protocol-queue','protocol-detail','protocol-interview','protocol-family','protocol-golden'].includes(page.key)){
                     const screenshot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(fixtures,page.key+'-'+theme+'-'+width+'.png'),Buffer.from(screenshot.data,'base64'));
                 }
             }

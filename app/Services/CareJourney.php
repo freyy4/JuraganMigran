@@ -87,7 +87,18 @@ class CareJourney
     {
         $code = strtoupper($application?->vacancy?->jobOrder?->country?->code ?? 'DEFAULT');
 
-        return DB::table('care_journey_templates')->where('country_code', $code)->first() ?? DB::table('care_journey_templates')->where('country_code', 'DEFAULT')->firstOrFail();
+        $template = DB::table('care_journey_templates')->where('country_code', $code)->first() ?? DB::table('care_journey_templates')->where('country_code', 'DEFAULT')->firstOrFail();
+        $stages = json_decode($template->stages, true);
+        $policy = json_decode($template->policy ?? '{}', true);
+        $order = $policy['stage_order'] ?? ['trust', 'screening', 'family', 'mcu', 'lpk', 'teto', 'opp', 'flight'];
+        $ordered = [];
+        foreach (array_unique([...$order, ...array_keys($stages)]) as $key) {
+            if (isset($stages[$key])) {
+                $ordered[$key] = $stages[$key];
+            }
+        }
+        $template->stages = json_encode($ordered);
+        return $template;
     }
 
     public function ledger(User $user, Candidate $candidate): Collection
