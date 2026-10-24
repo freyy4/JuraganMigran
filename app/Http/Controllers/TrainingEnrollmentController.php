@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\Company;
 use App\Models\TrainingBatch;
 use App\Models\TrainingEnrollment;
+use App\Services\TrustCommitmentProtocol;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -93,7 +94,7 @@ class TrainingEnrollmentController extends Controller
             }
             $application = Application::withTrashed()->findOrFail($data['application_id']);
             if (in_array($data['status'], ['ongoing', 'completed'], true)) {
-                app(\App\Services\TrustCommitmentProtocol::class)->authorize($request->user(), $application, 'protocol.placement');
+                app(TrustCommitmentProtocol::class)->authorize($request->user(), $application, 'protocol.placement');
             }
             if ($application->trashed() && ! $sameApplication) {
                 throw ValidationException::withMessages(['application_id' => 'Lamaran sudah dihapus.']);

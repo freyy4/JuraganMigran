@@ -127,13 +127,13 @@ return new class extends Migration
             $t->unsignedTinyInteger('end_hour')->default(17);
             $t->timestamps();
         });
-        $rolePermissions = ['cs' => ['protocol.lead'], 'supervisor' => ['protocol.lead', 'protocol.senior', 'protocol.override'], 'admin_operations' => ['protocol.ops']];
+        $rolePermissions = ['cs' => ['protocol.lead'], 'supervisor' => ['protocol.lead', 'protocol.senior', 'protocol.override'], 'admin_operations' => ['protocol.ops', 'health.mcu.schedule.write', 'health.mcu.summary.read', 'process.update', 'candidate.read.basic', 'candidate.read.timeline']];
         foreach (DB::table('crm_roles')->get() as $role) {
-            $extra = $role->code === 'migration_owner' ? ['protocol.lead', 'protocol.senior', 'protocol.ops', 'protocol.medical', 'protocol.placement', 'protocol.override', 'health.mcu.result.write'] : ($rolePermissions[$role->code] ?? []);
+            $extra = $role->code === 'migration_owner' ? ['protocol.lead', 'protocol.senior', 'protocol.ops', 'protocol.medical', 'protocol.placement', 'protocol.override', 'health.mcu.result.write', 'health.mcu.schedule.write'] : ($rolePermissions[$role->code] ?? []);
             DB::table('crm_roles')->where('id', $role->id)->update(['permissions' => json_encode(array_values(array_unique([...json_decode($role->permissions, true), ...$extra])))]);
         }
-        foreach (['medical_coordinator' => ['Koordinator Medis', ['protocol.medical', 'protocol.ops', 'health.mcu.result.write', 'health.mcu.summary.read', 'health.prescreen.read', 'health.prescreen.write']], 'placement_coordinator' => ['Koordinator Placement / LPK', ['protocol.placement']]] as $code => [$name, $permissions]) {
-            DB::table('crm_roles')->insertOrIgnore(['code' => $code, 'name' => $name, 'scope_type' => 'OPERATIONAL_ALL', 'permissions' => json_encode([...$permissions, 'candidate.read.basic', 'candidate.read.timeline', 'document.read.metadata', 'process.read', 'process.update', 'schedule.read', 'schedule.create', 'schedule.update']), 'is_admin' => false, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        foreach (['senior_interviewer' => ['Senior CS / Interviewer', ['protocol.senior', 'candidate.read.contact', 'health.prescreen.read']], 'medical_coordinator' => ['Koordinator Medis', ['protocol.medical', 'protocol.ops', 'health.mcu.schedule.write', 'health.mcu.result.write', 'health.mcu.summary.read', 'health.prescreen.read', 'health.prescreen.write']], 'placement_coordinator' => ['Koordinator Placement / LPK', ['protocol.placement']]] as $code => [$name, $permissions]) {
+            DB::table('crm_roles')->insertOrIgnore(['code' => $code, 'name' => $name, 'scope_type' => $code === 'senior_interviewer' ? 'TEAM' : 'OPERATIONAL_ALL', 'permissions' => json_encode([...$permissions, 'candidate.read.basic', 'candidate.read.timeline', 'document.read.metadata', 'process.read', 'process.update', 'schedule.read', 'schedule.create', 'schedule.update']), 'is_admin' => false, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
         }
     }
 

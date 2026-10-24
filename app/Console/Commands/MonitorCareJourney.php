@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Candidate;
 use App\Services\CareJourney;
+use App\Services\TrustCommitmentProtocol;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -28,7 +29,7 @@ class MonitorCareJourney extends Command
                 $care->sync($candidate);
             }
         });
-        app(\App\Services\TrustCommitmentProtocol::class)->monitor();
+        app(TrustCommitmentProtocol::class)->monitor();
         $this->info('Journey events synchronized; unresolved incident SLA checked.');
 
         return self::SUCCESS;

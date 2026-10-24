@@ -169,8 +169,16 @@ class PortalController extends Controller
             return [];
         }
         $schedules = collect();
+        $packages = \Illuminate\Support\Facades\Schema::hasTable('protocol_appointments') ? DB::table('protocol_appointments as p')->join('protocol_runs as r', 'r.id', '=', 'p.run_id')->where('r.application_id', $application->id)->where('p.status', 'CONFIRMED')->where('p.scheduled_at', '>=', now())->get(['p.*']) : collect();
+        foreach ($packages as $package) {
+            $items = collect(json_decode($package->checklist, true))->where('original', true)->pluck('name')->implode(', ');
+            $schedules->push(['id' => 'appointment-'.$package->id, 'title' => 'Kunjungan kantor, dokumen asli & MCU', 'at' => $package->scheduled_at, 'location' => $package->office_location, 'instructions' => 'Transport: '.$package->transport.'. Dokumen asli: '.($items ?: 'Konfirmasikan checklist kepada CS').'.']);
+        }
         foreach ([['interviews', 'Interview', 'scheduled_at'], ['medical_events', 'MCU', 'scheduled_at'], ['travel_events', 'Persiapan keberangkatan', 'scheduled_at'], ['flight_details', 'Penerbangan', 'departure_at']] as [$table,$label,$date]) {
             $query = DB::table($table)->where('application_id', $application->id)->whereNotNull($date)->where($date, '>=', now());
+            if ($table === 'medical_events' && $packages->isNotEmpty()) {
+                $query->whereNotIn('id', $packages->pluck('medical_event_id')->filter());
+            }
             if ($table !== 'flight_details') {
                 $query->where('status', 'scheduled');
             }

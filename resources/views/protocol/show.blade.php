@@ -1,9 +1,9 @@
 @extends('layouts.candidates')
 @section('title','Protokol Trust → Commitment')
-@push('styles')<link rel="stylesheet" href="{{ asset('css/care-journey.css') }}"><link rel="stylesheet" href="{{ asset('css/protocol.css').'?v='.filemtime(public_path('css/protocol.css')) }}">@endpush
+@push('styles')<link rel="stylesheet" href="{{ asset('css/care-journey.css').'?v='.filemtime(public_path('css/care-journey.css')) }}"><link rel="stylesheet" href="{{ asset('css/protocol.css').'?v='.filemtime(public_path('css/protocol.css')) }}">@endpush
 @push('scripts')<script src="{{ asset('js/protocol.js').'?v='.filemtime(public_path('js/protocol.js')) }}" defer></script>@endpush
 @section('content')
-<div class="care-root protocol-root" @if($run) data-protocol-version="{{ $run->version }}" data-protocol-state="{{ route('protocol.state',$application) }}" @endif>
+<div class="care-root protocol-root" @if($run) data-protocol-version="{{ $run->version }}" data-protocol-gate="{{ $gate['passed']?'1':'0' }}" data-protocol-state="{{ route('protocol.state',$application) }}" @endif>
     <div class="protocol-stale" role="status" hidden data-protocol-stale>Proses diperbarui oleh petugas lain. <button type="button" data-protocol-reload>Muat ulang data terbaru</button>. Isian Anda tetap tersedia sampai halaman dimuat ulang.</div>
     <nav class="care-breadcrumb"><a href="{{ route('protocol.index') }}">Antrean protokol</a> / <a href="{{ route('candidates.show',$application->candidate) }}">Detail CPMI</a> / <a href="{{ route('care.show',$application->candidate) }}">JM Care</a></nav>
     <header class="care-heading"><div><h1>{{ $application->candidate->person?->full_name }}</h1><p>{{ $application->application_code }} · {{ $application->vacancy?->title }} · {{ $application->vacancy?->jobOrder?->country?->name }}</p></div><strong>{{ $run?->mode ?? 'Belum dipetakan' }} · v8.27</strong></header>

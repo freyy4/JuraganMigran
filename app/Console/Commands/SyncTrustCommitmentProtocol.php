@@ -35,6 +35,7 @@ class SyncTrustCommitmentProtocol extends Command
             }
         });
         $this->info('Shadow mapping complete. Existing pipeline and medical facts preserved.');
+
         return self::SUCCESS;
     }
 }

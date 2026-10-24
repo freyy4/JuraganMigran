@@ -377,7 +377,7 @@ class AccessPolicy
             return $write ? 'health.prescreen.write' : 'health.prescreen.read';
         }
         if ($prefix === 'medical-events') {
-            return $write ? 'health.prescreen.write' : 'health.mcu.summary.read';
+            return $write ? 'health.mcu.schedule.write' : 'health.mcu.summary.read';
         }
         if (in_array($prefix, ['documents', 'document-verifications', 'missing-documents', 'expired-documents'])) {
             return match ($action) {

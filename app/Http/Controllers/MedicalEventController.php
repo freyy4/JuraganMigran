@@ -6,11 +6,14 @@ use App\Http\Requests\SaveMedicalEventRequest;
 use App\Models\Application;
 use App\Models\Company;
 use App\Models\MedicalEvent;
+use App\Services\AccessPolicy;
 use App\Services\CareJourney;
 use App\Services\DocumentRequirementEngine;
+use App\Services\TrustCommitmentProtocol;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -54,10 +57,10 @@ class MedicalEventController extends Controller
     {
         $data = $request->validated();
         $application = Application::whereKey($data['application_id'])->firstOrFail();
-        app(\App\Services\TrustCommitmentProtocol::class)->assertMcuAllowed($application);
+        app(TrustCommitmentProtocol::class)->assertMcuAllowed($application, $data['status'] === 'completed');
         $existing = $request->route('medical_event');
         if ($existing?->status === 'completed' || ($data['clearance_status'] ?? null) !== $existing?->clearance_status || (($data['status'] === 'completed') && $existing?->status !== 'completed')) {
-            app(\App\Services\TrustCommitmentProtocol::class)->authorize($request->user(), $application, 'health.mcu.result.write');
+            app(TrustCommitmentProtocol::class)->authorize($request->user(), $application, 'health.mcu.result.write');
         }
         foreach (['scheduled_at', 'completed_at'] as $field) {
             $data[$field] = empty($data[$field]) ? null : Carbon::createFromFormat('Y-m-d\TH:i', $data[$field], 'Asia/Jakarta')->setTimezone(config('app.timezone'))->startOfMinute();
@@ -86,9 +89,9 @@ class MedicalEventController extends Controller
 
     public function store(SaveMedicalEventRequest $request): RedirectResponse
     {
-        \Illuminate\Support\Facades\DB::transaction(function () use ($request): void {
+        DB::transaction(function () use ($request): void {
             $event = MedicalEvent::create([...$this->data($request), 'created_by' => $request->user()->id]);
-            app(\App\Services\AccessPolicy::class)->audit($request->user(), 'medical.result_create', ['medical_event_id' => $event->id, 'application_id' => $event->application_id]);
+            app(AccessPolicy::class)->audit($request->user(), 'medical.result_create', ['medical_event_id' => $event->id, 'application_id' => $event->application_id]);
         });
 
         return to_route('medical-events.index')->with('success', 'Jadwal MCU berhasil disimpan.');
@@ -96,11 +99,11 @@ class MedicalEventController extends Controller
 
     public function update(SaveMedicalEventRequest $request, MedicalEvent $medical_event): RedirectResponse
     {
-        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $medical_event): void {
+        DB::transaction(function () use ($request, $medical_event): void {
             $data = $this->data($request);
             $medical_event->update($data);
         });
-        app(\App\Services\AccessPolicy::class)->audit($request->user(), 'medical.result_update', ['medical_event_id' => $medical_event->id, 'application_id' => $medical_event->application_id]);
+        app(AccessPolicy::class)->audit($request->user(), 'medical.result_update', ['medical_event_id' => $medical_event->id, 'application_id' => $medical_event->application_id]);
 
         return to_route('medical-events.index')->with('success', 'Data MCU berhasil diperbarui.');
     }

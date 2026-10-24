@@ -1,6 +1,6 @@
 @extends('layouts.candidates')
 @section('title','Antrean Trust → Commitment')
-@push('styles')<link rel="stylesheet" href="{{ asset('css/care-journey.css') }}"><link rel="stylesheet" href="{{ asset('css/protocol.css').'?v='.filemtime(public_path('css/protocol.css')) }}">@endpush
+@push('styles')<link rel="stylesheet" href="{{ asset('css/care-journey.css').'?v='.filemtime(public_path('css/care-journey.css')) }}"><link rel="stylesheet" href="{{ asset('css/protocol.css').'?v='.filemtime(public_path('css/protocol.css')) }}">@endpush
 @section('content')
 <div class="care-root protocol-root">
 <header class="care-heading"><div><h1>Trust → Commitment</h1><p>Antrean peran, gate, PIC dan tenggat proses CPMI · v8.27</p></div><a class="care-button" href="{{ route('care.index') }}">JM Care</a></header>

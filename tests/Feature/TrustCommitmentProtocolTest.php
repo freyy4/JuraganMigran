@@ -5,17 +5,20 @@ namespace Tests\Feature;
 use App\Models\Application;
 use App\Models\ApplicationQualificationResult;
 use App\Models\CandidateDocument;
+use App\Models\Company;
 use App\Models\DocumentType;
 use App\Models\HealthInterview;
 use App\Models\MedicalEvent;
-use App\Models\RequirementDefinition;
+use App\Models\PipelineStage;
 use App\Models\TrainingEnrollment;
 use App\Models\User;
+use App\Services\ProcessStageTransition;
 use App\Services\TrustCommitmentProtocol;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class TrustCommitmentProtocolTest extends TestCase
@@ -28,12 +31,14 @@ class TrustCommitmentProtocolTest extends TestCase
         $policy = app(TrustCommitmentProtocol::class)->policy();
         $policy['new_application_mode'] = $mode;
         DB::table('protocol_settings')->where('id', 1)->update(['policy' => json_encode($policy)]);
+
         return Application::factory()->create();
     }
 
     private function payload(Application $app, string $action, array $extra = []): array
     {
         $run = DB::table('protocol_runs')->where('application_id', $app->id)->firstOrFail();
+
         return ['request_key' => (string) Str::uuid(), 'version' => $run->version, 'stage' => $run->stage, 'action' => $action] + $extra;
     }
 
@@ -197,7 +202,7 @@ class TrustCommitmentProtocolTest extends TestCase
         $medical = MedicalEvent::factory()->create(['application_id' => $app->id, 'scheduled_at' => now()->subDay()]);
         $data = ['application_id' => $app->id, 'clinic_id' => $medical->clinic_id, 'scheduled_at' => now('Asia/Jakarta')->subDay()->format('Y-m-d\TH:i'), 'completed_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'), 'status' => 'completed', 'clearance_status' => 'fit'];
         $role = DB::table('crm_roles')->where('id', $cs->crm_role_id)->first();
-        DB::table('crm_roles')->where('id', $role->id)->update(['permissions' => json_encode([...json_decode($role->permissions, true), 'health.mcu.summary.read'])]);
+        DB::table('crm_roles')->where('id', $role->id)->update(['permissions' => json_encode([...json_decode($role->permissions, true), 'health.mcu.summary.read', 'health.mcu.schedule.write'])]);
         $this->actingAs($cs)->put(route('medical-events.update', $medical), $data)->assertForbidden();
         $medic = User::factory()->create(['crm_role_id' => DB::table('crm_roles')->where('code', 'medical_coordinator')->value('id')]);
         $this->actingAs($medic)->put(route('medical-events.update', $medical), [...$data, 'clearance_status' => 'retest'])->assertSessionHasNoErrors()->assertRedirect();
@@ -271,4 +276,119 @@ class TrustCommitmentProtocolTest extends TestCase
         $this->post(route('protocol.action', $other), $this->payload($other, 'advance'))->assertNotFound();
         $this->post(route('protocol.action', $app), $this->payload($app, 'override', ['target' => 'family', 'reason_code' => 'FAMILY', 'reason' => 'Uji', 'risk_acknowledged' => 1]))->assertForbidden();
     }
+
+    public function test_content_governance_and_settings_versions_are_auditable_and_immutable(): void
+    {
+        $this->setupApplication();
+        $data = ['title' => 'Trust Pack Uji', 'version' => 1, 'source' => 'Program uji resmi', 'body' => 'Hak dan kewajiban program uji', 'effective_at' => now('Asia/Jakarta')->subHour()->format('Y-m-d\TH:i'), 'status' => 'Draft'];
+        $this->post(route('protocol.content'), $data)->assertSessionHasNoErrors()->assertRedirect();
+        $id = DB::table('protocol_content_versions')->value('id');
+        $this->post(route('protocol.content'), ['content_id' => $id, 'status' => 'Approved'])->assertSessionHasNoErrors();
+        $this->post(route('protocol.content'), ['content_id' => $id, 'status' => 'Draft'])->assertUnprocessable();
+        $this->assertDatabaseHas('protocol_content_versions', ['id' => $id, 'status' => 'Approved', 'approved_by' => auth()->id()]);
+        $policy = app(TrustCommitmentProtocol::class)->policy();
+        $settings = ['version' => 1, 'new_application_mode' => 'GUIDED', 'golden_hours' => [8, 16, 24], 'stages' => collect($policy['stages'])->map(fn ($item) => ['hours' => $item['hours'], 'action' => $item['action']])->all()];
+        $this->post(route('protocol.settings'), $settings)->assertSessionHasNoErrors();
+        $this->post(route('protocol.settings'), $settings)->assertConflict();
+        $this->assertSame([8, 16, 24], app(TrustCommitmentProtocol::class)->policy()['golden_hours']);
+        $new = Application::factory()->create();
+        $this->assertDatabaseHas('protocol_runs', ['application_id' => $new->id, 'mode' => 'GUIDED']);
+    }
+
+    public function test_appointment_reminders_are_consolidated_and_do_not_duplicate_medical_or_tasks(): void
+    {
+        $app = $this->setupApplication();
+        $this->moveFixture($app, 'appointment');
+        $medical = MedicalEvent::factory()->create(['application_id' => $app->id]);
+        $payload = $this->payload($app, 'appointment', ['pic_id' => auth()->id(), 'office_location' => 'Kantor uji', 'scheduled_at' => now('Asia/Jakarta')->addDay()->format('Y-m-d\TH:i'), 'transport' => 'Mandiri', 'medical_event_id' => $medical->id, 'appointment_status' => 'CONFIRMED']);
+        $this->post(route('protocol.action', $app), $payload)->assertSessionHasNoErrors();
+        $this->post(route('protocol.action', $app), $payload)->assertSessionHasNoErrors();
+        $this->artisan('care:monitor')->assertSuccessful();
+        $this->artisan('care:monitor')->assertSuccessful();
+        $this->assertSame(1, DB::table('care_events')->where('event_type', 'APPOINTMENT_REMINDER')->count());
+        $this->travel(1)->days();
+        $this->artisan('care:monitor')->assertSuccessful();
+        $this->assertSame(2, DB::table('care_events')->where('event_type', 'APPOINTMENT_REMINDER')->count());
+        $this->assertDatabaseCount('medical_events', 1);
+        $this->assertDatabaseCount('protocol_appointments', 1);
+    }
+
+    public function test_legacy_mapping_is_shadow_and_preserves_real_sources_and_pipeline(): void
+    {
+        $app = $this->setupApplication();
+        $original = $app->current_stage_id;
+        $runId = DB::table('protocol_runs')->where('application_id', $app->id)->value('id');
+        DB::table('protocol_runs')->where('id', $runId)->delete();
+        $medical = MedicalEvent::factory()->create(['application_id' => $app->id, 'status' => 'completed', 'completed_at' => now(), 'clearance_status' => 'fit']);
+        $this->artisan('protocol:sync', ['--dry-run' => true])->assertSuccessful();
+        $this->assertDatabaseCount('protocol_runs', 0);
+        $this->artisan('protocol:sync')->assertSuccessful();
+        $this->artisan('protocol:sync')->assertSuccessful();
+        $this->assertDatabaseHas('protocol_runs', ['application_id' => $app->id, 'mode' => 'SHADOW', 'stage' => 'golden']);
+        $this->assertSame($original, $app->fresh()->current_stage_id);
+        $this->assertDatabaseCount('medical_events', 1);
+        $this->assertDatabaseCount('protocol_golden_windows', 1);
+        $this->assertDatabaseCount('tasks', 1);
+    }
+
+    public function test_enforced_protocol_blocks_early_mcu_and_pipeline_bypass(): void
+    {
+        $app = $this->setupApplication();
+        $clinic = Company::factory()->create(['type' => 'clinic', 'status' => 'active']);
+        $this->post(route('medical-events.store'), ['application_id' => $app->id, 'clinic_id' => $clinic->id, 'scheduled_at' => now('Asia/Jakarta')->addDay()->format('Y-m-d\TH:i'), 'status' => 'scheduled'])->assertSessionHasErrors('application_id');
+        $target = PipelineStage::factory()->create(['sequence' => 900]);
+        try {
+            app(ProcessStageTransition::class)->move(auth()->user(), $app, ['from_stage_id' => $app->current_stage_id, 'to_stage_id' => $target->id]);
+            $this->fail('Pipeline must respect enforced protocol.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('to_stage_id', $exception->errors());
+        }
+        $this->get(route('protocol.state', $app))->assertOk()->assertExactJson(['version' => 1, 'stage' => 'opt_in', 'gate_passed' => false])->assertHeader('Cache-Control', 'no-store, private');
+    }
+
+    public function test_every_protocol_stage_renders_with_theme_and_canonical_profile_links(): void
+    {
+        $app = $this->setupApplication('SHADOW');
+        $app->candidate->person->update(['full_name' => 'CPMI Uji Protokol']);
+        $run = DB::table('protocol_runs')->where('application_id', $app->id)->first();
+        DB::table('protocol_family_consents')->insert(['run_id' => $run->id, 'signatory_role' => 'PARENT_GUARDIAN', 'created_at' => now(), 'updated_at' => now()]);
+        $app->candidate->contacts()->create(['name' => 'Kontak Uji Keluarga', 'relationship' => 'Orang tua']);
+        $manifest = [];
+        $directory = getenv('PROTOCOL_QA_FIXTURES');
+        if ($directory && ! is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+        foreach (array_keys(config('protocol.stages')) as $stage) {
+            $this->moveFixture($app, $stage);
+            $response = $this->get(route('protocol.show', $app))->assertOk()->assertSee('protocol.css')->assertSee('data-theme-toggle', false)->assertDontSee('name="person[full_name]"', false);
+            if ($directory) {
+                $key = 'protocol-'.$stage;
+                file_put_contents($directory.'/'.$key.'.html', $response->getContent());
+                $manifest[] = ['key' => $key];
+            }
+        }
+        $response = $this->get(route('protocol.index'))->assertOk()->assertSee('Bottleneck');
+        if ($directory) {
+            file_put_contents($directory.'/protocol-queue.html', $response->getContent());
+            $manifest[] = ['key' => 'protocol-queue'];
+            file_put_contents($directory.'/manifest.json', json_encode($manifest));
+        }
+    }
+    public function test_corrected_medical_result_returns_accountability_and_reopens_fit_safely(): void
+    {
+        $app = $this->setupApplication();
+        $this->moveFixture($app, 'waiting');
+        $medical = MedicalEvent::factory()->create(['application_id' => $app->id, 'status' => 'completed', 'completed_at' => now(), 'clearance_status' => 'fit']);
+        $this->assertSame('golden', $this->stage($app));
+        $medical->update(['clearance_status' => 'retest']);
+        $this->assertSame('result', $this->stage($app));
+        $this->assertDatabaseHas('protocol_golden_windows', ['status' => 'MEDICAL_REVIEW']);
+        $this->assertSame(0, DB::table('tasks')->whereNotIn('status', ['completed', 'cancelled'])->count());
+        $medical->update(['clearance_status' => 'fit']);
+        $this->assertSame('golden', $this->stage($app));
+        $this->assertDatabaseCount('protocol_golden_windows', 1);
+        $this->assertSame(1, DB::table('tasks')->where('status', 'open')->count());
+        $this->assertSame(1, DB::table('protocol_stage_instances')->whereNull('exited_at')->count());
+    }
+
 }

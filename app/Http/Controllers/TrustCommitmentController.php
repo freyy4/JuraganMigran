@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Application;
 use App\Models\User;
 use App\Services\AccessPolicy;
-use App\Services\CareJourney;
+use App\Services\DocumentRequirementEngine;
+use App\Services\ProcessWorkflow;
 use App\Services\TrustCommitmentProtocol;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -54,22 +56,24 @@ class TrustCommitmentController extends Controller
         $golden = $run && ($can('protocol.placement') || $can('health.mcu.summary.read')) ? DB::table('protocol_golden_windows')->where('run_id', $run->id)->first() : null;
         $documents = $can('document.read.metadata') ? $this->protocol->checklist($application) : [];
         $contacts = $can('candidate.read.contact') ? $application->candidate->contacts()->get() : collect();
-        $evidence = $can('document.read.metadata') ? app(\App\Services\DocumentRequirementEngine::class)->documents($application) : collect();
+        $evidence = $can('document.read.metadata') ? app(DocumentRequirementEngine::class)->documents($application) : collect();
         $medical = $can('protocol.ops') || $can('protocol.medical') ? $application->medicalEvents()->with('clinic')->get() : collect();
         $enrollments = $can('protocol.placement') ? $application->trainingEnrollments()->with('batch.company')->get() : collect();
         $people = User::where('is_active', true)->get(['id', 'name'])->filter(fn ($u) => app(AccessPolicy::class)->applicationIds($u, 'process.update')->where('applications.id', $application->id)->exists());
         $blockers = $application->blockers()->whereNotIn('status', ['resolved', 'completed', 'done', 'cancelled', 'closed'])->with('owner')->get();
         $interview = $can('protocol.senior') ? $application->interviews()->where('type', 'senior_protocol')->latest('id')->first() : null;
         $health = $can('health.prescreen.read') ? $application->latestHealthInterview : null;
-        $workflow = app(\App\Services\ProcessWorkflow::class)->stages($application);
+        $workflow = app(ProcessWorkflow::class)->stages($application);
+
         return view('protocol.show', compact('application', 'run', 'definition', 'stage', 'gate', 'can', 'canAct', 'content', 'consent', 'appointment', 'golden', 'documents', 'contacts', 'evidence', 'medical', 'enrollments', 'people', 'blockers', 'interview', 'health', 'workflow'));
     }
 
-    public function state(Request $request, Application $application): \Illuminate\Http\JsonResponse
+    public function state(Request $request, Application $application): JsonResponse
     {
         $this->protocol->authorize($request->user(), $application, 'process.read');
-        $run = DB::table('protocol_runs')->where('application_id', $application->id)->first(['version', 'stage']);
-        return response()->json(['version' => $run?->version, 'stage' => $run?->stage])->header('Cache-Control', 'private, no-store');
+        $run = DB::table('protocol_runs')->where('application_id', $application->id)->first();
+
+        return response()->json(['version' => $run?->version, 'stage' => $run?->stage, 'gate_passed' => $run ? $this->protocol->gate($application, $run)['passed'] : false])->header('Cache-Control', 'private, no-store');
     }
 
     public function action(Request $request, Application $application): RedirectResponse
@@ -98,6 +102,7 @@ class TrustCommitmentController extends Controller
             }
             $this->protocol->act($request->user(), $application, $data);
         }
+
         return back()->with('success', 'Protokol diperbarui. PIC, gate dan tindakan berikutnya sudah disinkronkan.');
     }
 
@@ -118,6 +123,7 @@ class TrustCommitmentController extends Controller
             DB::table('protocol_settings')->where('id', 1)->update(['policy' => json_encode($policy), 'version' => $settings->version + 1, 'updated_at' => now()]);
         });
         app(AccessPolicy::class)->audit($request->user(), 'protocol.settings_updated');
+
         return back()->with('success', 'Kebijakan protokol tersimpan untuk proses baru; snapshot proses berjalan tetap dapat diaudit.');
     }
 
@@ -143,6 +149,7 @@ class TrustCommitmentController extends Controller
             }
         });
         app(AccessPolicy::class)->audit($request->user(), 'protocol.content_updated', ['content_id' => $data['content_id'] ?? null, 'status' => $data['status']]);
+
         return back()->with('success', 'Versi materi tersimpan. Hanya Approved yang dapat digunakan CS.');
     }
 
@@ -152,6 +159,7 @@ class TrustCommitmentController extends Controller
         DB::table('protocol_routing_profiles')->updateOrInsert(['user_id' => $data['user_id']], [...collect($data)->except(['queues', 'country_codes'])->all(), 'queues' => json_encode($data['queues']), 'country_codes' => json_encode(array_values(array_filter(array_map('trim', explode(',', strtoupper($data['country_codes'] ?? '')))))), 'created_at' => now(), 'updated_at' => now()]);
         app(AccessPolicy::class)->audit($request->user(), 'protocol.routing_updated', ['user_id' => $data['user_id']]);
         $this->protocol->monitor();
+
         return back()->with('success', 'Routing tersimpan. Penugasan tetap memeriksa izin, negara, kapasitas dan jam kerja WIB.');
     }
 }

@@ -11,7 +11,7 @@
             const response=await fetch(root.dataset.protocolState,{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'});
             if(!response.ok)return;
             const state=await response.json();
-            if(state.version!==null&&Number(state.version)!==Number(root.dataset.protocolVersion)){
+            if(state.version!==null&&Number(state.version)!==Number(root.dataset.protocolVersion)||state.gate_passed!==(root.dataset.protocolGate==='1')){
                 if(!dirty){location.reload();return;}
                 root.querySelector('[data-protocol-stale]').hidden=false;
             }

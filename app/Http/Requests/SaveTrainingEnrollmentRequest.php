@@ -22,7 +22,7 @@ class SaveTrainingEnrollmentRequest extends FormRequest
             if ($enrollment) {
                 $query->orWhere('id', $enrollment->application_id);
             }
-        })], 'batch_id' => ['required', 'integer', Rule::exists('training_batches', 'id')], 'status' => ['required', Rule::in(array_keys(TrainingEnrollment::STATUSES))], 'joined_at' => [Rule::requiredIf(in_array($this->input('status'), ['ongoing', 'completed'], true) || $this->filled('completed_at')), 'nullable', 'date_format:Y-m-d'], 'completed_at' => ['required_if:status,completed', 'nullable', 'date_format:Y-m-d', 'after_or_equal:joined_at']];
+        })], 'batch_id' => ['required', 'integer', Rule::exists('training_batches', 'id')], 'status' => ['required', Rule::in(array_keys(TrainingEnrollment::STATUSES))], 'joined_at' => [Rule::requiredIf(in_array($this->input('status'), ['ongoing', 'completed'], true) || $this->filled('completed_at')), 'nullable', 'date_format:Y-m-d', ...(in_array($this->input('status'), ['ongoing', 'completed'], true) ? ['before_or_equal:today'] : [])], 'completed_at' => ['required_if:status,completed', 'nullable', 'date_format:Y-m-d', 'after_or_equal:joined_at']];
     }
 
     public function messages(): array

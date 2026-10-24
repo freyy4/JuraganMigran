@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\TrainingEnrollment;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -73,12 +74,18 @@ class TrustCommitmentProtocol
         $definition = $this->definition($run)['stages'][$stage];
         $owner = $this->routeOwner($application, $definition);
         $due = now()->addHours($definition['hours']);
+        if ($stage === 'custody_mcu') {
+            $appointment = DB::table('protocol_appointments')->where('run_id', $run->id)->first();
+            if ($appointment && Carbon::parse($appointment->scheduled_at)->isFuture()) {
+                $due = Carbon::parse($appointment->scheduled_at)->addHours($definition['hours']);
+            }
+        }
         $task = null;
         if ($owner || $stage === 'golden') {
             $task = Task::create(['application_id' => $application->id, 'assigned_to' => $owner, 'task_type' => 'protocol', 'title' => $definition['action'], 'due_at' => $due, 'status' => 'open', 'priority' => $stage === 'golden' ? 'high' : 'normal', 'created_by' => auth()->id()])->id;
         }
-        DB::table('protocol_stage_instances')->insert(['run_id' => $run->id, 'stage' => $stage, 'queue' => $definition['queue'], 'owner_id' => $owner, 'next_action' => $definition['action'], 'due_at' => $due, 'task_id' => $task, 'entered_at' => now()]);
-        $this->event($application, 'protocol-handoff:'.$run->id.':'.$stage, 'STAGE_HANDOFF', ['title' => $definition['label'].' → '.$definition['queue'], 'owner_id' => $owner, 'next_action' => $definition['action'], 'due_at' => $due->toIso8601String()]);
+        DB::table('protocol_stage_instances')->updateOrInsert(['run_id' => $run->id, 'stage' => $stage], ['blocker_status' => 'CLEAR', 'blocker_id' => null, 'exited_at' => null, 'queue' => $definition['queue'], 'owner_id' => $owner, 'next_action' => $definition['action'], 'due_at' => $due, 'task_id' => $task, 'entered_at' => now()]);
+        $this->event($application, 'protocol-handoff:'.$run->id.':'.$stage.':'.$run->version, 'STAGE_HANDOFF', ['title' => $definition['label'].' → '.$definition['queue'], 'owner_id' => $owner, 'next_action' => $definition['action'], 'due_at' => $due->toIso8601String()]);
     }
 
     private function routeOwner(Application $application, array $definition, ?int $exclude = null): ?int
@@ -86,20 +93,27 @@ class TrustCommitmentProtocol
         $country = strtoupper($application->vacancy?->jobOrder?->country?->code ?? '');
         $hour = now('Asia/Jakarta')->hour;
         $profiles = DB::table('protocol_routing_profiles')->where('available', true)->where('start_hour', '<=', $hour)->where('end_hour', '>', $hour)->when($exclude, fn ($q) => $q->where('user_id', '!=', $exclude))->lockForUpdate()->get();
+
         return $profiles->filter(function ($profile) use ($application, $definition, $country): bool {
             $queues = json_decode($profile->queues, true);
             $countries = json_decode($profile->country_codes, true);
             $user = User::find($profile->user_id);
+
             return $user && in_array($definition['queue'], $queues, true) && ($countries === [] || in_array($country, $countries, true)) && app(AccessPolicy::class)->applicationIds($user, $definition['permission'])->where('applications.id', $application->id)->exists();
         })->map(function ($profile): object {
             $profile->load = DB::table('protocol_stage_instances')->whereNull('exited_at')->where('owner_id', $profile->user_id)->count();
+
             return $profile;
         })->filter(fn ($p) => $p->load < $p->capacity)->sortBy(fn ($p) => [$p->load / max(1, $p->capacity), $p->user_id])->first()?->user_id;
     }
 
     private function event(Application $application, string $key, string $type, array $payload, string $permission = 'candidate.read.timeline'): void
     {
+        $exists = DB::table('care_events')->where('source_key', $key)->exists();
         app(CareJourney::class)->event($application->candidate, $key, $type, $payload, $permission, auth()->user(), $application->id, true, $this->careStage($type));
+        if (! $exists && in_array($type, ['APPOINTMENT_CONFIRMED', 'APPOINTMENT_REMINDER', 'MCU_FIT', 'LPK_ADMITTED'], true) && DB::table('portal_accounts')->where('candidate_id', $application->candidate_id)->where('status', 'active')->where('in_app_notifications', true)->exists()) {
+            DB::table('portal_notifications')->insert(['candidate_id' => $application->candidate_id, 'category' => 'PROCESS_UPDATE', 'title' => match ($type) { 'APPOINTMENT_CONFIRMED' => 'Kunjungan Anda diperbarui', 'APPOINTMENT_REMINDER' => 'Pengingat kunjungan kantor', 'MCU_FIT' => 'Persiapan masuk LPK', default => 'Masuk LPK terkonfirmasi' }, 'body_safe' => 'Periksa jadwal dan langkah berikutnya di portal. Hubungi CS jika membutuhkan bantuan.', 'deep_link' => '/portal/schedules', 'created_at' => now(), 'updated_at' => now()]);
+        }
     }
 
     private function careStage(string $type): string
@@ -116,6 +130,7 @@ class TrustCommitmentProtocol
     private function lastAction(object $run, string $stage): array
     {
         $payload = DB::table('protocol_actions')->where('run_id', $run->id)->where('stage', $stage)->where('action', 'outcome')->latest('id')->value('payload');
+
         return $payload ? json_decode(Crypt::decryptString($payload), true) : [];
     }
 
@@ -143,6 +158,7 @@ class TrustCommitmentProtocol
             'country' => [false, 'Lanjutkan proses negara melalui template workflow penempatan yang berlaku.'],
         };
         $blocked = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->where('blocker_status', 'BLOCKED')->exists() || $application->blockers()->where('priority', 'urgent')->whereNotIn('status', [...ApplicationBlocker::RESOLVED, 'closed', 'cancelled'])->exists();
+
         return ['passed' => (bool) $result[0] && ! $blocked, 'reason' => $blocked ? 'Selesaikan kendala aktif terlebih dahulu. '.$result[1] : $result[1], 'blocked' => $blocked];
     }
 
@@ -155,6 +171,7 @@ class TrustCommitmentProtocol
         if (! $consent || $consent->status !== 'COMPLETE' || ! $consent->verified_at || ! $consent->document_id) {
             return false;
         }
+
         return app(DocumentRequirementEngine::class)->rows($application)->contains(fn ($row) => (int) $row['rule']->document_type_id === (int) ($policy['consent_document_type_id'] ?? 0) && $row['verified']);
     }
 
@@ -164,6 +181,7 @@ class TrustCommitmentProtocol
         if ($requirements->isEmpty()) {
             return false;
         }
+
         return $requirements->every(fn ($r) => $application->qualificationResults()->where('vacancy_requirement_id', $r->id)->where(fn ($q) => $q->where('result', 'passed')->orWhere(fn ($review) => $review->where('result', 'review')->whereNotNull('reason')->where('reason', '!=', '')))->exists());
     }
 
@@ -178,12 +196,14 @@ class TrustCommitmentProtocol
             return false;
         }
         $missing = collect($this->checklist($application))->where('required', true)->where('verified', false);
+
         return $missing->isEmpty() || $application->blockers()->where('category', 'DOCUMENT')->whereNotIn('status', [...ApplicationBlocker::RESOLVED, 'closed', 'cancelled'])->whereNotNull('owner_id')->whereNotNull('due_at')->whereNotNull('next_action')->exists();
     }
 
     private function originalsReady(Application $application): bool
     {
         $requirements = collect($this->checklist($application))->where('required', true)->where('original', true);
+
         return $requirements->every(fn ($row) => DB::table('original_document_custodies as custody')->join('candidate_documents as d', 'd.id', '=', 'custody.candidate_document_id')->where('d.candidate_id', $application->candidate_id)->where('d.document_type_id', $row['type_id'])->where(fn ($q) => $q->where('custody.application_id', $application->id)->orWhereNull('custody.application_id'))->whereIn('custody.custody_state', ['RECEIVED_BY_JM', 'HELD_BY_JM', 'HANDED_TO_PT', 'HELD_BY_PT'])->exists());
     }
 
@@ -208,6 +228,7 @@ class TrustCommitmentProtocol
             $fingerprint = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
             if ($previous = DB::table('protocol_actions')->where('request_key', $data['request_key'])->first()) {
                 abort_unless($previous->run_id === $run->id && $previous->actor_id === $actor->id && hash_equals($previous->fingerprint, $fingerprint), 409, 'Kunci permintaan sudah digunakan untuk aksi berbeda.');
+
                 return;
             }
             abort_unless($run->version === (int) $data['version'] && $run->stage === $data['stage'], 409, 'Proses sudah berubah. Muat ulang untuk melihat PIC dan gate terbaru.');
@@ -334,16 +355,22 @@ class TrustCommitmentProtocol
                 $data['batch_id'] = $enrollment->batch_id;
                 $data['target_admission_at'] = $enrollment->joined_at?->toIso8601String() ?? $enrollment->batch->start_date?->toIso8601String();
                 $data['checkin_days'] = [1, 3, 7];
+                if (! $data['target_admission_at']) {
+                    throw ValidationException::withMessages(['enrollment_id' => 'Tetapkan target masuk pada pelatihan atau tanggal mulai batch.']);
+                }
                 break;
         }
         $careOutcome = match ($data['response'] ?? '') {
-            'FAMILY_DOUBT' => 'FAMILY', 'DISTRUST', 'CLARIFY' => 'UNSURE', default => match ($data['reason_code'] ?? '') { 'FAMILY' => 'FAMILY', 'TRANSPORT', 'SUPPORT' => 'FINANCIAL', 'NO_RESPONSE' => 'UNREACHABLE', default => 'CONTINUE' },
+            'FAMILY_DOUBT' => 'FAMILY', 'DISTRUST', 'CLARIFY' => 'UNSURE', default => match ($data['reason_code'] ?? '') {
+                'FAMILY' => 'FAMILY', 'TRANSPORT', 'SUPPORT' => 'FINANCIAL', 'NO_RESPONSE' => 'UNREACHABLE', default => 'CONTINUE'
+            },
         };
         $this->event($application, 'protocol-outcome:'.$data['request_key'], 'PROTOCOL_OUTCOME', ['title' => 'Hasil percakapan '.$run->stage.' dicatat', 'stage' => $run->stage, 'outcome' => $careOutcome]);
         if ($careOutcome !== 'CONTINUE' || (($data['interview_outcome'] ?? 'continue') !== 'continue')) {
             $next = config('care.outcomes.'.$careOutcome, 'Tindak lanjuti hasil wawancara');
             DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->update(['next_action' => 'Follow-up: '.$next]);
         }
+
         return $data;
     }
 
@@ -452,7 +479,16 @@ class TrustCommitmentProtocol
                 if ($golden && $golden->status === 'OPEN') {
                     DB::table('protocol_golden_windows')->where('id', $golden->id)->update(['status' => 'MEDICAL_REVIEW', 'updated_at' => now()]);
                     Task::withoutGlobalScopes()->whereKey($golden->task_id)->update(['status' => 'cancelled']);
+                    if (in_array($run->stage, ['golden', 'onboarding'], true)) {
+                        $current = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->first();
+                        DB::table('protocol_stage_instances')->where('id', $current->id)->update(['exited_at' => now()]);
+                        Task::withoutGlobalScopes()->whereKey($current->task_id)->update(['status' => 'cancelled']);
+                        DB::table('protocol_runs')->where('id', $run->id)->update(['stage' => 'result', 'version' => $run->version + 1, 'updated_at' => now()]);
+                        $this->openStage($application, $run, 'result');
+                        $this->event($application, 'protocol-medical-review:'.$run->id.':'.$run->version, 'PROTOCOL_MEDICAL_REVIEW', ['title' => 'Hasil resmi berubah: koordinasi medis diperlukan'], 'health.mcu.summary.read');
+                    }
                 }
+
                 return;
             }
             if ($golden && in_array($golden->status, ['OPEN', 'CLOSED'], true)) {
@@ -466,6 +502,11 @@ class TrustCommitmentProtocol
             if ($admitted) {
                 return;
             }
+            if ($run->mode !== 'ENFORCED' && array_search($run->stage, array_keys($definition['stages']), true) < 10) {
+                $this->advance($application, $run, 'golden', true);
+                DB::table('protocol_runs')->where('id', $run->id)->increment('version');
+                $run = DB::table('protocol_runs')->find($run->id);
+            }
             $taskId = $run->stage === 'golden' ? DB::table('protocol_stage_instances')->where('run_id', $run->id)->where('stage', 'golden')->value('task_id') : null;
             if (in_array($run->stage, ['waiting', 'result'], true)) {
                 while ($run->stage !== 'golden') {
@@ -475,7 +516,7 @@ class TrustCommitmentProtocol
                 }
                 $taskId = DB::table('protocol_stage_instances')->where('run_id', $run->id)->where('stage', 'golden')->value('task_id');
             }
-            DB::table('protocol_golden_windows')->updateOrInsert(['run_id' => $run->id], ['medical_event_id' => $medical->id, 'task_id' => $taskId, 'fit_at' => $medical->completed_at ?? now(), 'sla_hours' => json_encode($definition['golden_hours']), 'status' => 'OPEN', 'escalation_level' => 0, 'closed_at' => null, 'created_at' => $golden->created_at ?? now(), 'updated_at' => now()]);
+            DB::table('protocol_golden_windows')->updateOrInsert(['run_id' => $run->id], ['medical_event_id' => $medical->id, 'task_id' => $taskId, 'fit_at' => $medical->updated_at ?? now(), 'sla_hours' => json_encode($definition['golden_hours']), 'status' => 'OPEN', 'escalation_level' => 0, 'closed_at' => null, 'created_at' => $golden->created_at ?? now(), 'updated_at' => now()]);
             $this->event($application, 'protocol-fit:'.$run->id.':'.$medical->id, 'MCU_FIT', ['title' => 'MCU FIT: antrean prioritas Placement / LPK', 'queue' => 'FIT_TO_LPK'], 'health.mcu.summary.read');
         });
     }
@@ -518,13 +559,13 @@ class TrustCommitmentProtocol
         }
     }
 
-    public function assertMcuAllowed(Application $application): void
+    public function assertMcuAllowed(Application $application, bool $result = false): void
     {
         if (! $this->available()) {
             return;
         }
         $run = DB::table('protocol_runs')->where('application_id', $application->id)->first();
-        if ($run && $run->mode === 'ENFORCED' && array_search($run->stage, array_keys($this->definition($run)['stages']), true) < 8) {
+        if ($run && $run->mode === 'ENFORCED' && array_search($run->stage, array_keys($this->definition($run)['stages']), true) < ($result ? 10 : 8)) {
             throw ValidationException::withMessages(['application_id' => 'Selesaikan protokol hingga Office Appointment sebelum menjadwalkan MCU.']);
         }
     }
@@ -547,7 +588,8 @@ class TrustCommitmentProtocol
                     $profile = $stage->owner_id ? DB::table('protocol_routing_profiles')->where('user_id', $stage->owner_id)->first() : null;
                     $owner = $stage->owner_id ? User::find($stage->owner_id) : null;
                     $hour = now('Asia/Jakarta')->hour;
-                    $unavailable = ! $owner || ! $owner->is_active || ! $profile || ! $profile->available || $hour < $profile->start_hour || $hour >= $profile->end_hour || ! app(AccessPolicy::class)->applicationIds($owner, $definition['permission'])->where('applications.id', $application->id)->exists();
+                    $country = strtoupper($application->vacancy?->jobOrder?->country?->code ?? '');
+                    $unavailable = ($profile && (! in_array($stage->queue, json_decode($profile->queues, true), true) || (json_decode($profile->country_codes, true) !== [] && ! in_array($country, json_decode($profile->country_codes, true), true)))) || ! $owner || ! $owner->is_active || ! $profile || ! $profile->available || $hour < $profile->start_hour || $hour >= $profile->end_hour || ! app(AccessPolicy::class)->applicationIds($owner, $definition['permission'])->where('applications.id', $application->id)->exists();
                     if ($unavailable) {
                         $newOwner = $this->routeOwner($application, $definition, $stage->owner_id);
                         if ($newOwner !== $stage->owner_id) {
@@ -588,7 +630,7 @@ class TrustCommitmentProtocol
         });
     }
 
-    public function queue(User $actor): \Illuminate\Support\Collection
+    public function queue(User $actor): Collection
     {
         return DB::table('protocol_stage_instances as s')->join('protocol_runs as r', 'r.id', '=', 's.run_id')->join('applications as a', 'a.id', '=', 'r.application_id')->join('candidates as c', 'c.id', '=', 'a.candidate_id')->join('persons as p', 'p.id', '=', 'c.person_id')->leftJoin('users as u', 'u.id', '=', 's.owner_id')->leftJoin('protocol_golden_windows as g', 'g.run_id', '=', 'r.id')->whereNull('s.exited_at')->whereNull('a.deleted_at')->whereIn('a.id', app(AccessPolicy::class)->applicationIds($actor, 'process.read')->select('applications.id'))->select('s.*', 'r.application_id', 'r.mode', 'r.version', 'p.full_name', 'c.id as candidate_id', 'u.name as owner_name', 'g.fit_at', 'g.closed_at', 'g.escalation_level', 'g.status as golden_status')->orderBy('s.due_at')->get();
     }

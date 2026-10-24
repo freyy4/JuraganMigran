@@ -20,6 +20,7 @@ use App\Services\AccessPolicy;
 use App\Services\CareJourney;
 use App\Services\ProcessWorkflow;
 use App\Services\TrackingHub;
+use App\Services\TrustCommitmentProtocol;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -92,8 +93,8 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         Application::created(function (Application $application): void {
-            if (app(\App\Services\TrustCommitmentProtocol::class)->available()) {
-                app(\App\Services\TrustCommitmentProtocol::class)->initialize($application);
+            if (app(TrustCommitmentProtocol::class)->available()) {
+                app(TrustCommitmentProtocol::class)->initialize($application);
             }
             if ($application->workflow_version_id && $application->current_stage_id) {
                 $stage = app(ProcessWorkflow::class)->stage($application, $application->current_stage_id);
@@ -106,7 +107,7 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         TrainingEnrollment::saved(function (TrainingEnrollment $enrollment): void {
-            app(\App\Services\TrustCommitmentProtocol::class)->trainingSaved($enrollment);
+            app(TrustCommitmentProtocol::class)->trainingSaved($enrollment);
             if ($enrollment->status === 'ongoing' && ($enrollment->wasChanged('status') || $enrollment->wasRecentlyCreated)) {
                 app(TrackingHub::class)->milestone($enrollment->application_id, 'LPK_JOINED', 'training-joined-'.$enrollment->id);
             }
@@ -117,7 +118,7 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         MedicalEvent::saved(function (MedicalEvent $medical): void {
-            app(\App\Services\TrustCommitmentProtocol::class)->medicalSaved($medical);
+            app(TrustCommitmentProtocol::class)->medicalSaved($medical);
         });
         MedicalEvent::created(function (MedicalEvent $medical): void {
             if ($medical->status === 'scheduled') {
