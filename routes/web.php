@@ -502,6 +502,13 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     Route::post('data-master/{master}', [MasterDataController::class, 'store'])->name('master-data.store');
     Route::get('data-master/{master}/{record}/edit', [MasterDataController::class, 'edit'])->whereNumber('record')->name('master-data.edit');
     Route::put('data-master/{master}/{record}', [MasterDataController::class, 'update'])->whereNumber('record')->name('master-data.update');
+    Route::get('protokol', [\App\Http\Controllers\TrustCommitmentController::class, 'index'])->name('protocol.index');
+    Route::get('protokol/lamaran/{application}', [\App\Http\Controllers\TrustCommitmentController::class, 'show'])->name('protocol.show');
+    Route::post('protokol/lamaran/{application}', [\App\Http\Controllers\TrustCommitmentController::class, 'action'])->name('protocol.action');
+    Route::post('protokol/pengaturan', [\App\Http\Controllers\TrustCommitmentController::class, 'settings'])->name('protocol.settings');
+    Route::post('protokol/materi', [\App\Http\Controllers\TrustCommitmentController::class, 'content'])->name('protocol.content');
+    Route::post('protokol/routing', [\App\Http\Controllers\TrustCommitmentController::class, 'routing'])->name('protocol.routing');
+
     Route::get('jm-care', [CareJourneyController::class, 'index'])->name('care.index');
     Route::get('jm-care/cpmi/{candidate}', [CareJourneyController::class, 'show'])->name('care.show');
     foreach (['touchpoint', 'issue', 'support', 'decision'] as $careAction) {

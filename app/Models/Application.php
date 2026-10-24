@@ -138,6 +138,11 @@ class Application extends Model
         });
     }
 
+    public function medicalEvents(): HasMany
+    {
+        return $this->hasMany(MedicalEvent::class);
+    }
+
     public function trainingEnrollments(): HasMany
     {
         return $this->hasMany(TrainingEnrollment::class);

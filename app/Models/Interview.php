@@ -16,11 +16,11 @@ class Interview extends Model
 
     public const TIMEZONE = 'Asia/Jakarta';
 
-    protected $fillable = ['application_id', 'type', 'scheduled_at', 'interviewer_id', 'meeting_link', 'status', 'outcome', 'notes'];
+    protected $fillable = ['application_id', 'type', 'scheduled_at', 'interviewer_id', 'meeting_link', 'status', 'outcome', 'notes', 'protocol_rubric', 'protocol_reason_code'];
 
     protected function casts(): array
     {
-        return ['scheduled_at' => 'datetime'];
+        return ['scheduled_at' => 'datetime', 'protocol_rubric' => 'array'];
     }
 
     public function application(): BelongsTo

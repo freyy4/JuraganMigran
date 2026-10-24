@@ -92,6 +92,9 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         Application::created(function (Application $application): void {
+            if (app(\App\Services\TrustCommitmentProtocol::class)->available()) {
+                app(\App\Services\TrustCommitmentProtocol::class)->initialize($application);
+            }
             if ($application->workflow_version_id && $application->current_stage_id) {
                 $stage = app(ProcessWorkflow::class)->stage($application, $application->current_stage_id);
                 $application->stageHistories()->create(['from_stage_id' => null, 'to_stage_id' => $application->current_stage_id, 'entered_at' => now(), 'changed_by' => auth()->id(), 'reason' => 'Tahap awal sesuai versi alur lowongan.', 'sla_hours_snapshot' => $stage['sla_hours'] ?? null]);
@@ -103,6 +106,7 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         TrainingEnrollment::saved(function (TrainingEnrollment $enrollment): void {
+            app(\App\Services\TrustCommitmentProtocol::class)->trainingSaved($enrollment);
             if ($enrollment->status === 'ongoing' && ($enrollment->wasChanged('status') || $enrollment->wasRecentlyCreated)) {
                 app(TrackingHub::class)->milestone($enrollment->application_id, 'LPK_JOINED', 'training-joined-'.$enrollment->id);
             }
@@ -111,6 +115,9 @@ class AppServiceProvider extends ServiceProvider
             if ($interview->status === 'completed' && ($interview->wasChanged('status') || $interview->wasRecentlyCreated)) {
                 app(TrackingHub::class)->milestone($interview->application_id, 'INTERVIEW_COMPLETED', 'interview-completed-'.$interview->id);
             }
+        });
+        MedicalEvent::saved(function (MedicalEvent $medical): void {
+            app(\App\Services\TrustCommitmentProtocol::class)->medicalSaved($medical);
         });
         MedicalEvent::created(function (MedicalEvent $medical): void {
             if ($medical->status === 'scheduled') {

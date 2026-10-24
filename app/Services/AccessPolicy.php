@@ -34,7 +34,7 @@ class AccessPolicy
         $policies = [];
         $roles = DB::table('crm_roles')->where('id', $user->crm_role_id)->where('active', true)->get();
         foreach ($roles as $role) {
-            if ($role->code === 'super_admin' && ! in_array($permission, ['health.prescreen.read', 'health.prescreen.write', 'health.prescreen.complete', 'health.prescreen.review', 'health.sensitive.reveal', 'health.mcu.document.read', 'health.mcu.summary.read', 'health.template.publish', 'document.view.file', 'document.download', 'document.verify', 'document.request_correction', 'document.reject', 'document.exception.approve'], true) && in_array($permission, config('governance.permissions'), true)) {
+            if ($role->code === 'super_admin' && ! in_array($permission, ['health.mcu.result.write', 'health.prescreen.read', 'health.prescreen.write', 'health.prescreen.complete', 'health.prescreen.review', 'health.sensitive.reveal', 'health.mcu.document.read', 'health.mcu.summary.read', 'health.template.publish', 'document.view.file', 'document.download', 'document.verify', 'document.request_correction', 'document.reject', 'document.exception.approve'], true) && in_array($permission, config('governance.permissions'), true)) {
                 $policies[] = ['scope' => 'OPERATIONAL_ALL', 'refs' => []];
 
                 continue;
@@ -311,6 +311,13 @@ class AccessPolicy
         }
         if ($prefix === 'portal-admin') {
             return $action === 'invite' ? 'candidate.update.profile' : 'candidate.read.basic';
+        }
+        if ($prefix === 'protocol') {
+            return match ($action) {
+                'settings', 'content', 'routing' => 'admin.master_data.manage',
+                'action' => 'process.update',
+                default => 'process.read',
+            };
         }
         if ($prefix === 'care') {
             return match ($action) {

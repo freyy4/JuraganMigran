@@ -12,7 +12,7 @@ class MedicalEvent extends Model
 
     public const STATUSES = ['scheduled' => 'Dijadwalkan', 'completed' => 'Selesai', 'cancelled' => 'Dibatalkan'];
 
-    public const CLEARANCES = ['fit' => 'Fit', 'unfit' => 'Unfit', 'pending' => 'Menunggu Hasil'];
+    public const CLEARANCES = ['fit' => 'Fit', 'unfit' => 'Unfit', 'pending' => 'Menunggu Hasil / Review', 'retest' => 'Pemeriksaan Ulang'];
 
     protected $fillable = ['application_id', 'clinic_id', 'scheduled_at', 'completed_at', 'status', 'clearance_status', 'expires_at', 'created_by'];
 

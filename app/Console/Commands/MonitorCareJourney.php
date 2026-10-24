@@ -28,6 +28,7 @@ class MonitorCareJourney extends Command
                 $care->sync($candidate);
             }
         });
+        app(\App\Services\TrustCommitmentProtocol::class)->monitor();
         $this->info('Journey events synchronized; unresolved incident SLA checked.');
 
         return self::SUCCESS;

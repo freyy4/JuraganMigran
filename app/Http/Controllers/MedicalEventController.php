@@ -53,6 +53,12 @@ class MedicalEventController extends Controller
     private function data(SaveMedicalEventRequest $request): array
     {
         $data = $request->validated();
+        $application = Application::whereKey($data['application_id'])->firstOrFail();
+        app(\App\Services\TrustCommitmentProtocol::class)->assertMcuAllowed($application);
+        $existing = $request->route('medical_event');
+        if ($existing?->status === 'completed' || ($data['clearance_status'] ?? null) !== $existing?->clearance_status || (($data['status'] === 'completed') && $existing?->status !== 'completed')) {
+            app(\App\Services\TrustCommitmentProtocol::class)->authorize($request->user(), $application, 'health.mcu.result.write');
+        }
         foreach (['scheduled_at', 'completed_at'] as $field) {
             $data[$field] = empty($data[$field]) ? null : Carbon::createFromFormat('Y-m-d\TH:i', $data[$field], 'Asia/Jakarta')->setTimezone(config('app.timezone'))->startOfMinute();
         }
@@ -87,7 +93,9 @@ class MedicalEventController extends Controller
 
     public function update(SaveMedicalEventRequest $request, MedicalEvent $medical_event): RedirectResponse
     {
-        $medical_event->update($this->data($request));
+        $data = $this->data($request);
+        $medical_event->update($data);
+        app(\App\Services\AccessPolicy::class)->audit($request->user(), 'medical.result_update', ['medical_event_id' => $medical_event->id, 'application_id' => $medical_event->application_id]);
 
         return to_route('medical-events.index')->with('success', 'Data MCU berhasil diperbarui.');
     }
