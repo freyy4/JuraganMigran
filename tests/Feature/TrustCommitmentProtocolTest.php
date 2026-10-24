@@ -161,6 +161,7 @@ class TrustCommitmentProtocolTest extends TestCase
     {
         $app = $this->setupApplication();
         $this->post(route('protocol.action', $app), $this->payload($app, 'block', ['reason_code' => 'FAMILY']))->assertSessionHasErrors('reason');
+        $this->post(route('protocol.action', $app), $this->payload($app, 'block', ['reason_code' => 'FAMILY', 'reason' => 'Kendala uji', 'owner_id' => auth()->id(), 'next_action' => 'Hubungi wali', 'due_at' => now('Asia/Jakarta')->subHour()->format('Y-m-d\TH:i')]))->assertSessionHasErrors('due_at');
         $this->act($app, 'block', ['reason_code' => 'FAMILY', 'reason' => 'Perlu penjelasan keluarga', 'owner_id' => auth()->id(), 'next_action' => 'Hubungi wali', 'due_at' => now('Asia/Jakarta')->addDay()->format('Y-m-d\TH:i')]);
         $this->post(route('protocol.action', $app), $this->payload($app, 'advance'))->assertSessionHasErrors('gate');
         $this->act($app, 'override', ['target' => 'trust', 'reason_code' => 'FAMILY', 'reason' => 'Edukasi keluarga bersama Trust Pack', 'risk_acknowledged' => 1]);

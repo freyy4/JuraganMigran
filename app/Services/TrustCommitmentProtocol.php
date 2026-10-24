@@ -373,7 +373,7 @@ class TrustCommitmentProtocol
                     throw ValidationException::withMessages(['handover' => 'Pilih pelatihan aktual dan lengkapi handover serta transport.']);
                 }
                 $enrollment = TrainingEnrollment::where('application_id', $application->id)->whereKey($data['enrollment_id'] ?? 0)->with('batch.enrollments')->firstOrFail();
-                if (in_array($enrollment->batch->status, ['cancelled', 'completed'], true) || ($enrollment->batch->capacity !== null && $enrollment->batch->enrollments->whereIn('status', ['scheduled', 'ongoing'])->count() > $enrollment->batch->capacity)) {
+                if (in_array($enrollment->batch->status, ['cancelled', 'completed'], true) || ($enrollment->batch->capacity !== null && DB::table('training_enrollments')->where('batch_id', $enrollment->batch_id)->where('status', '!=', 'withdrawn')->count() > $enrollment->batch->capacity)) {
                     throw ValidationException::withMessages(['enrollment_id' => 'Batch tidak aktif atau kapasitas LPK sudah terlampaui.']);
                 }
                 $data['batch_id'] = $enrollment->batch_id;
@@ -404,6 +404,9 @@ class TrustCommitmentProtocol
             if (blank($data[$field] ?? null)) {
                 throw ValidationException::withMessages([$field => 'Kendala wajib memiliki alasan, PIC penyelesaian, tindakan dan tenggat.']);
             }
+        }
+        if (! Carbon::parse($data['due_at'])->isFuture()) {
+            throw ValidationException::withMessages(['due_at' => 'Tenggat penyelesaian harus setelah waktu sekarang (WIB).']);
         }
         $owner = User::findOrFail($data['owner_id']);
         $this->authorize($owner, $application, 'process.update');

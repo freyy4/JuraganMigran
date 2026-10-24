@@ -118,7 +118,9 @@ class AppServiceProvider extends ServiceProvider
             }
         });
         MedicalEvent::saved(function (MedicalEvent $medical): void {
-            app(TrustCommitmentProtocol::class)->medicalSaved($medical);
+            if ($medical->wasRecentlyCreated || $medical->isDirty(['status', 'clearance_status', 'completed_at', 'expires_at', 'clinic_id'])) {
+                app(TrustCommitmentProtocol::class)->medicalSaved($medical);
+            }
         });
         MedicalEvent::created(function (MedicalEvent $medical): void {
             if ($medical->status === 'scheduled') {

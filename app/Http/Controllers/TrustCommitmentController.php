@@ -11,6 +11,7 @@ use App\Services\TrustCommitmentProtocol;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -23,9 +24,12 @@ class TrustCommitmentController extends Controller
     public function index(Request $request): View
     {
         abort_unless($this->protocol->available(), 404);
-        $request->validate(['queue' => 'nullable|string|max:40', 'overdue' => 'nullable|boolean']);
+        $request->validate(['queue' => 'nullable|string|max:40', 'overdue' => 'nullable|boolean', 'page' => 'nullable|integer|min:1']);
         $all = $this->protocol->queue($request->user());
         $rows = $all->when($request->filled('queue'), fn ($rows) => $rows->where('queue', $request->input('queue')))->when($request->boolean('overdue'), fn ($rows) => $rows->filter(fn ($row) => Carbon::parse($row->due_at)->isPast()));
+        $filtered = $rows->values();
+        $page = (int) $request->input('page', 1);
+        $rows = new LengthAwarePaginator($filtered->forPage($page, 20)->values(), $filtered->count(), 20, $page, ['path' => $request->url(), 'query' => $request->query()]);
         $metrics = $all->groupBy('stage')->map(fn ($group) => ['count' => $group->count(), 'age' => round($group->map(fn ($row) => Carbon::parse($row->entered_at)->diffInHours(now()))->median(), 1), 'overdue' => $group->filter(fn ($row) => Carbon::parse($row->due_at)->isPast())->count()]);
         $settings = DB::table('protocol_settings')->find(1);
         $policy = $this->protocol->policy();
