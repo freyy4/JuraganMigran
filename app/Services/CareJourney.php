@@ -383,7 +383,7 @@ class CareJourney
         if ($welfareDue && (! $welfareCheck || Carbon::parse($welfareDue->occurred_at)->gt(Carbon::parse($welfareCheck->occurred_at)))) {
             $signals[] = ['level' => 1, 'reason' => 'Welfare check LPK belum dikonfirmasi', 'action' => 'Konfirmasi kondisi CPMI melalui welfare check'];
         }
-        $lastManual = $events->firstWhere('event_type', 'touchpoint');
+        $lastManual = $events->first(fn (object $event): bool => in_array($event->event_type, ['touchpoint', 'PROTOCOL_OUTCOME'], true));
         if ($lastManual && in_array($lastManual->data['outcome'] ?? null, ['UNSURE', 'WITHDRAWAL', 'FAMILY', 'FINANCIAL', 'UNREACHABLE'], true)) {
             $outcome = $lastManual->data['outcome'];
             $signals[] = ['level' => $outcome === 'WITHDRAWAL' ? 2 : 1, 'reason' => config('care.outcomes.'.$outcome), 'action' => $outcome === 'FAMILY' ? 'Jadwalkan Family Assurance Call' : ($outcome === 'WITHDRAWAL' ? 'Dengarkan keputusan CPMI; lakukan exit review tanpa menghalangi hak berhenti' : 'Hubungi CPMI dan identifikasi dukungan yang diperlukan')];
@@ -397,7 +397,7 @@ class CareJourney
                 $signals[] = ['level' => 2, 'reason' => 'MCU memenuhi syarat; onboarding LPK melewati SLA '.$lpkDays.' hari', 'action' => 'Prioritaskan onboarding LPK dan evaluasi kebutuhan transport'];
             }
         }
-        $meaningful = $events->first(fn (object $event): bool => in_array($event->event_type, ['message_received', 'message_sent', 'touchpoint', 'followup_completed'], true));
+        $meaningful = $events->first(fn (object $event): bool => in_array($event->event_type, ['message_received', 'message_sent', 'touchpoint', 'followup_completed', 'PROTOCOL_OUTCOME'], true));
         if ($meaningful && Carbon::parse($meaningful->occurred_at)->addDays(config('care.silent_days'))->isPast()) {
             $signals[] = ['level' => 1, 'reason' => 'Belum ada touchpoint bermakna selama '.config('care.silent_days').' hari', 'action' => 'Hubungi CPMI dan konfirmasi kelanjutan proses'];
         }

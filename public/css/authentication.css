@@ -26,3 +26,5 @@ html[data-theme=dark] .auth-page .auth-submit{background:linear-gradient(110deg,
 html[data-theme=dark] .auth-page .auth-footer svg{display:none}
 html[data-theme=dark] .auth-page :is(a,button):focus-visible{outline-color:#9fceff}
 @media(max-width:760px){.auth-theme-control{top:20px;right:18px}.auth-theme-control [data-theme-label]{display:none}.auth-mobile-brand{padding-right:48px}}
+
+html[data-theme=dark] .auth-story{background:#18344a}

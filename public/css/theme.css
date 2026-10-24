@@ -128,3 +128,5 @@ html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color
 html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color.green{background:#126346}
 html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color.amber{background:#5d421a}
 html[data-theme=dark] body.crm-layout #main-content .sc-root form label.sc-color.purple{background:#533c7f}
+
+html[data-theme=dark] .site-eyebrow{background:#203d5c;color:#badcff}html[data-theme=dark] .portal-body .current-stage{background:#203650;color:#d9e8fb;border-color:#3c5574}

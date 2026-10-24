@@ -65,6 +65,13 @@ class TrustCommitmentController extends Controller
         return view('protocol.show', compact('application', 'run', 'definition', 'stage', 'gate', 'can', 'canAct', 'content', 'consent', 'appointment', 'golden', 'documents', 'contacts', 'evidence', 'medical', 'enrollments', 'people', 'blockers', 'interview', 'health', 'workflow'));
     }
 
+    public function state(Request $request, Application $application): \Illuminate\Http\JsonResponse
+    {
+        $this->protocol->authorize($request->user(), $application, 'process.read');
+        $run = DB::table('protocol_runs')->where('application_id', $application->id)->first(['version', 'stage']);
+        return response()->json(['version' => $run?->version, 'stage' => $run?->stage])->header('Cache-Control', 'private, no-store');
+    }
+
     public function action(Request $request, Application $application): RedirectResponse
     {
         $data = $request->validate([
@@ -75,7 +82,7 @@ class TrustCommitmentController extends Controller
             'reason_code' => ['nullable', Rule::in(array_keys(config('protocol.blockers')))], 'reason' => 'nullable|string|max:1000', 'risk_acknowledged' => 'nullable|boolean', 'owner_id' => 'nullable|integer|exists:users,id', 'next_action' => 'nullable|string|max:255', 'due_at' => 'nullable|date_format:Y-m-d\TH:i|after:now',
             'consent_status' => 'nullable|in:EXPLAINED,HESITANT,AGREED,SENT,SIGNED,VERIFIED,COMPLETE', 'contact_id' => 'nullable|integer', 'document_id' => 'nullable|integer', 'template_version' => 'nullable|string|max:100', 'verification_method' => 'nullable|string|max:255', 'endorsement' => 'nullable|string|max:255',
             'pic_id' => 'nullable|integer|exists:users,id', 'office_location' => 'nullable|string|max:255', 'scheduled_at' => 'nullable|date_format:Y-m-d\TH:i', 'transport' => 'nullable|string|max:255', 'medical_event_id' => 'nullable|integer', 'appointment_status' => 'nullable|in:CONFIRMED,ATTENDED,NO_SHOW,CANCELLED',
-            'mode' => 'nullable|in:SHADOW,GUIDED,ENFORCED', 'enrollment_id' => 'nullable|integer', 'handover' => 'nullable|string|max:1000',
+            'mode' => 'nullable|in:SHADOW,GUIDED,ENFORCED', 'enrollment_id' => 'nullable|integer', 'handover' => 'nullable|string|max:1000', 'support_reviewed' => 'nullable|boolean',
         ]);
         foreach (['due_at', 'scheduled_at'] as $field) {
             if (filled($data[$field] ?? null)) {
@@ -104,7 +111,7 @@ class TrustCommitmentController extends Controller
             $policy = json_decode($settings->policy, true);
             abort_unless(array_keys($data['stages']) === array_keys($policy['stages']), 422);
             foreach ($data['stages'] as $key => $values) {
-                $policy['stages'][$key] = [...$policy['stages'][$key], ...$values];
+                $policy['stages'][$key] = [...$policy['stages'][$key], ...$values, 'hours' => (int) $values['hours']];
             }
             $policy['golden_hours'] = array_map('intval', $data['golden_hours']);
             $policy['new_application_mode'] = $data['new_application_mode'];
@@ -117,6 +124,14 @@ class TrustCommitmentController extends Controller
     public function content(Request $request): RedirectResponse
     {
         $data = $request->validate(['content_id' => 'nullable|integer', 'title' => 'required_without:content_id|string|max:150', 'version' => 'required_without:content_id|integer|min:1', 'source' => 'required_without:content_id|string|max:255', 'body' => 'required_without:content_id|string|max:12000', 'effective_at' => 'required_without:content_id|date', 'expires_at' => 'nullable|date|after:effective_at', 'vacancy_id' => 'nullable|integer|exists:vacancies,id', 'status' => 'required|in:Draft,Approved,Archived']);
+        if (! isset($data['content_id'])) {
+            $request->validate(['version' => [Rule::unique('protocol_content_versions', 'version')->where('title', $data['title'])]]);
+            foreach (['effective_at', 'expires_at'] as $field) {
+                if (filled($data[$field] ?? null)) {
+                    $data[$field] = Carbon::parse($data[$field], 'Asia/Jakarta')->utc()->toDateTimeString();
+                }
+            }
+        }
         DB::transaction(function () use ($request, $data): void {
             if (isset($data['content_id'])) {
                 $content = DB::table('protocol_content_versions')->where('id', $data['content_id'])->lockForUpdate()->firstOrFail();

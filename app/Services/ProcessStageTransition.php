@@ -15,6 +15,7 @@ class ProcessStageTransition
         DB::transaction(function () use ($actor, $application, $data): void {
             $locked = Application::whereKey($application->id)->lockForUpdate()->firstOrFail();
             $destination = PipelineStage::whereKey($data['to_stage_id'])->lockForUpdate()->firstOrFail();
+            app(TrustCommitmentProtocol::class)->assertPipelineTransition($locked, $destination->id);
             app(ProcessWorkflow::class)->assertTransition($locked, $destination->id);
             $destinationConfig = app(ProcessWorkflow::class)->stage($locked, $destination->id);
             if (! $locked->workflow_version_id && ! $destination->is_active) {

@@ -133,7 +133,7 @@ class TrustCommitmentProtocol
             'health' => [$application->latestHealthInterview()->where('status', 'completed')->exists(), 'Screening awal wajib diselesaikan melalui modul kesehatan; bukan diagnosis.'],
             'documents' => [$this->documentsDiscovered($application, $action), 'Review daftar dokumen dan keluarga; setiap dokumen kurang harus memiliki kendala ber-PIC.'],
             'interview' => [Interview::where('application_id', $application->id)->where('type', 'senior_protocol')->where('status', 'completed')->where('outcome', 'continue')->whereNotNull('protocol_rubric')->exists(), 'Wawancara senior dengan tujuh rubric dan outcome Lanjut diperlukan.'],
-            'family' => [! $consent || $consent->status === 'COMPLETE', 'Selesaikan izin keluarga, bukti dokumen dan verifikasi sesuai aturan program.'],
+            'family' => [$this->familyReady($application, $consent), 'Selesaikan izin keluarga, bukti dokumen dan verifikasi sesuai aturan program.'],
             'appointment' => [$appointment && $appointment->status === 'CONFIRMED' && $appointment->medical_event_id !== null, 'Konfirmasi paket kunjungan dengan MCU, PIC, lokasi dan transport.'],
             'custody_mcu' => [$appointment && $appointment->status === 'ATTENDED' && $medical && $this->originalsReady($application), 'Konfirmasi hadir, MCU terhubung dan custody semua dokumen asli wajib.'],
             'waiting' => [$medical?->status === 'completed' && filled($medical?->clearance_status), 'Menunggu hasil resmi dari petugas medis berwenang.'],
@@ -142,8 +142,20 @@ class TrustCommitmentProtocol
             'onboarding' => [$application->trainingEnrollments()->whereIn('status', ['ongoing', 'completed'])->whereNotNull('joined_at')->exists(), 'Konfirmasi admission aktual melalui pelatihan / check-in LPK.'],
             'country' => [false, 'Lanjutkan proses negara melalui template workflow penempatan yang berlaku.'],
         };
-        $blocked = $application->blockers()->whereNotIn('status', [...ApplicationBlocker::RESOLVED, 'closed', 'cancelled'])->exists();
+        $blocked = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->where('blocker_status', 'BLOCKED')->exists() || $application->blockers()->where('priority', 'urgent')->whereNotIn('status', [...ApplicationBlocker::RESOLVED, 'closed', 'cancelled'])->exists();
         return ['passed' => (bool) $result[0] && ! $blocked, 'reason' => $blocked ? 'Selesaikan kendala aktif terlebih dahulu. '.$result[1] : $result[1], 'blocked' => $blocked];
+    }
+
+    private function familyReady(Application $application, ?object $consent): bool
+    {
+        $policy = json_decode(app(CareJourney::class)->template($application)->policy ?? '{}', true);
+        if (! ($policy['consent_required'] ?? false)) {
+            return true;
+        }
+        if (! $consent || $consent->status !== 'COMPLETE' || ! $consent->verified_at || ! $consent->document_id) {
+            return false;
+        }
+        return app(DocumentRequirementEngine::class)->rows($application)->contains(fn ($row) => (int) $row['rule']->document_type_id === (int) ($policy['consent_document_type_id'] ?? 0) && $row['verified']);
     }
 
     private function qualified(Application $application): bool
@@ -211,7 +223,7 @@ class TrustCommitmentProtocol
                         if (blank($data['reason_code'] ?? null) || blank($data['reason'] ?? null) || ! ($data['risk_acknowledged'] ?? false)) {
                             throw ValidationException::withMessages(['reason' => 'Override memerlukan reason code, alasan dan konfirmasi risiko.']);
                         }
-                        if ($run->stage === 'result' || $data['target'] === 'golden') {
+                        if ($run->stage === 'result' || ($data['target'] ?? '') === 'golden') {
                             throw ValidationException::withMessages(['target' => 'Override tidak dapat menyatakan FIT. Gunakan hasil MCU resmi.']);
                         }
                         $payload['skipped_gate'] = $run->stage;
@@ -221,6 +233,9 @@ class TrustCommitmentProtocol
                     $this->advance($application, $run, $data['target'] ?? null, $data['action'] === 'override');
                     break;
                 case 'outcome':
+                    if (! in_array($run->stage, ['opt_in', 'trust', 'value', 'documents', 'interview', 'golden'], true)) {
+                        throw ValidationException::withMessages(['stage' => 'Gunakan modul sumber untuk tahap ini.']);
+                    }
                     $payload = $this->outcome($actor, $application, $run, $data);
                     break;
                 case 'block':
@@ -309,17 +324,26 @@ class TrustCommitmentProtocol
                 $this->event($application, 'protocol-interview:'.$data['request_key'], 'INTERVIEW_COMPLETED', ['title' => 'Wawancara senior selesai', 'outcome' => $data['interview_outcome']]);
                 break;
             case 'golden':
-                if (blank($data['handover'] ?? null) || blank($data['transport'] ?? null)) {
+                if (blank($data['handover'] ?? null) || blank($data['transport'] ?? null) || ! ($data['support_reviewed'] ?? false)) {
                     throw ValidationException::withMessages(['handover' => 'Pilih pelatihan aktual dan lengkapi handover serta transport.']);
                 }
                 $enrollment = TrainingEnrollment::where('application_id', $application->id)->whereKey($data['enrollment_id'] ?? 0)->with('batch.enrollments')->firstOrFail();
-                if (in_array($enrollment->batch->status, ['cancelled', 'completed'], true) || $enrollment->batch->enrollments->whereIn('status', ['scheduled', 'ongoing'])->count() > $enrollment->batch->capacity) {
+                if (in_array($enrollment->batch->status, ['cancelled', 'completed'], true) || ($enrollment->batch->capacity !== null && $enrollment->batch->enrollments->whereIn('status', ['scheduled', 'ongoing'])->count() > $enrollment->batch->capacity)) {
                     throw ValidationException::withMessages(['enrollment_id' => 'Batch tidak aktif atau kapasitas LPK sudah terlampaui.']);
                 }
                 $data['batch_id'] = $enrollment->batch_id;
+                $data['target_admission_at'] = $enrollment->joined_at?->toIso8601String() ?? $enrollment->batch->start_date?->toIso8601String();
+                $data['checkin_days'] = [1, 3, 7];
                 break;
         }
-        $this->event($application, 'protocol-outcome:'.$data['request_key'], 'PROTOCOL_OUTCOME', ['title' => 'Hasil percakapan '.$run->stage.' dicatat', 'stage' => $run->stage]);
+        $careOutcome = match ($data['response'] ?? '') {
+            'FAMILY_DOUBT' => 'FAMILY', 'DISTRUST', 'CLARIFY' => 'UNSURE', default => match ($data['reason_code'] ?? '') { 'FAMILY' => 'FAMILY', 'TRANSPORT', 'SUPPORT' => 'FINANCIAL', 'NO_RESPONSE' => 'UNREACHABLE', default => 'CONTINUE' },
+        };
+        $this->event($application, 'protocol-outcome:'.$data['request_key'], 'PROTOCOL_OUTCOME', ['title' => 'Hasil percakapan '.$run->stage.' dicatat', 'stage' => $run->stage, 'outcome' => $careOutcome]);
+        if ($careOutcome !== 'CONTINUE' || (($data['interview_outcome'] ?? 'continue') !== 'continue')) {
+            $next = config('care.outcomes.'.$careOutcome, 'Tindak lanjuti hasil wawancara');
+            DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->update(['next_action' => 'Follow-up: '.$next]);
+        }
         return $data;
     }
 
@@ -349,8 +373,8 @@ class TrustCommitmentProtocol
         $this->ensureConsent($application, $run);
         $case = DB::table('protocol_family_consents')->where('run_id', $run->id)->firstOrFail();
         $states = ['NOT_CONTACTED', 'EXPLAINED', 'HESITANT', 'AGREED', 'SENT', 'SIGNED', 'VERIFIED', 'COMPLETE'];
-        $position = array_search($case->status, $states, true);
-        if (($states[$position + 1] ?? null) !== ($data['consent_status'] ?? null)) {
+        $transitions = ['NOT_CONTACTED' => ['EXPLAINED'], 'EXPLAINED' => ['HESITANT', 'AGREED'], 'HESITANT' => ['EXPLAINED', 'AGREED'], 'AGREED' => ['SENT'], 'SENT' => ['SIGNED'], 'SIGNED' => ['VERIFIED'], 'VERIFIED' => ['COMPLETE'], 'COMPLETE' => []];
+        if (! in_array($data['consent_status'] ?? '', $transitions[$case->status], true)) {
             throw ValidationException::withMessages(['consent_status' => 'Ikuti urutan status izin keluarga.']);
         }
         $changes = ['status' => $data['consent_status'], 'updated_at' => now(), 'version' => $case->version + 1];
@@ -420,6 +444,9 @@ class TrustCommitmentProtocol
             Application::withoutGlobalScopes()->whereKey($application->id)->lockForUpdate()->firstOrFail();
             $run = DB::table('protocol_runs')->where('application_id', $application->id)->lockForUpdate()->firstOrFail();
             $this->event($application, 'protocol-medical:'.$medical->id.':'.$medical->updated_at->format('Uu').':'.$medical->clearance_status, 'MCU_RESULT_RECORDED', ['title' => 'Hasil MCU diperbarui oleh sumber medis', 'medical_event_id' => $medical->id], 'health.mcu.summary.read');
+            if ((int) DB::table('medical_events')->where('application_id', $application->id)->max('id') !== $medical->id) {
+                return;
+            }
             $golden = DB::table('protocol_golden_windows')->where('run_id', $run->id)->first();
             if ($medical->status !== 'completed' || $medical->clearance_status !== 'fit') {
                 if ($golden && $golden->status === 'OPEN') {
@@ -435,7 +462,11 @@ class TrustCommitmentProtocol
                 return;
             }
             $definition = $this->definition($run);
-            $taskId = null;
+            $admitted = TrainingEnrollment::withoutGlobalScopes()->where('application_id', $application->id)->whereIn('status', ['ongoing', 'completed'])->whereNotNull('joined_at')->where('joined_at', '<=', now())->first();
+            if ($admitted) {
+                return;
+            }
+            $taskId = $run->stage === 'golden' ? DB::table('protocol_stage_instances')->where('run_id', $run->id)->where('stage', 'golden')->value('task_id') : null;
             if (in_array($run->stage, ['waiting', 'result'], true)) {
                 while ($run->stage !== 'golden') {
                     $this->advance($application, $run);
@@ -470,6 +501,21 @@ class TrustCommitmentProtocol
             $this->event($application, 'protocol-admitted:'.$enrollment->id, 'LPK_ADMITTED', ['title' => 'Masuk LPK terkonfirmasi; check-in Care terjadwal', 'enrollment_id' => $enrollment->id]);
             app(CareJourney::class)->sync($application->candidate);
         });
+    }
+
+    public function assertPipelineTransition(Application $application, int $destination): void
+    {
+        if (! $this->available()) {
+            return;
+        }
+        $run = DB::table('protocol_runs')->where('application_id', $application->id)->first();
+        if ($run && $run->mode === 'ENFORCED' && $run->stage !== 'country') {
+            $target = app(ProcessWorkflow::class)->stage($application, $destination);
+            $current = $application->current_stage_id ? app(ProcessWorkflow::class)->stage($application, $application->current_stage_id) : null;
+            if (($target['sequence'] ?? 0) > ($current['sequence'] ?? -1)) {
+                throw ValidationException::withMessages(['to_stage_id' => 'Selesaikan gate Trust → Commitment sebelum melanjutkan pipeline penempatan.']);
+            }
+        }
     }
 
     public function assertMcuAllowed(Application $application): void

@@ -504,6 +504,7 @@ Route::middleware(['auth', CrmAccess::class])->group(function (): void {
     Route::put('data-master/{master}/{record}', [MasterDataController::class, 'update'])->whereNumber('record')->name('master-data.update');
     Route::get('protokol', [\App\Http\Controllers\TrustCommitmentController::class, 'index'])->name('protocol.index');
     Route::get('protokol/lamaran/{application}', [\App\Http\Controllers\TrustCommitmentController::class, 'show'])->name('protocol.show');
+    Route::get('protokol/lamaran/{application}/state', [\App\Http\Controllers\TrustCommitmentController::class, 'state'])->name('protocol.state');
     Route::post('protokol/lamaran/{application}', [\App\Http\Controllers\TrustCommitmentController::class, 'action'])->name('protocol.action');
     Route::post('protokol/pengaturan', [\App\Http\Controllers\TrustCommitmentController::class, 'settings'])->name('protocol.settings');
     Route::post('protokol/materi', [\App\Http\Controllers\TrustCommitmentController::class, 'content'])->name('protocol.content');

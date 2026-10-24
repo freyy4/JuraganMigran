@@ -6,6 +6,7 @@ $groups = [
         ['key' => 'finance-cockpit', 'label' => 'Dashboard Keuangan', 'route' => 'cockpit.index', 'active' => 'cockpit.index', 'parameters' => ['role' => 'finance'], 'permission' => 'finance.sponsor_receivable.read'],
     ]],
     ['label' => 'CRM', 'items' => [
+        ['key' => 'protocol-queue', 'label' => 'Trust → Commitment', 'route' => 'protocol.index', 'active' => 'protocol.*', 'permission' => 'process.read'],
         ...config('conversation.enabled') ? [
             ['key' => 'crm-inbox', 'label' => 'Inbox', 'route' => 'crm.inbox', 'active' => 'crm.inbox'],
             ['key' => 'crm-followup', 'label' => 'Lead Follow Up', 'route' => 'crm.followups', 'active' => 'crm.followups'],

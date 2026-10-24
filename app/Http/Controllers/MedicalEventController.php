@@ -86,15 +86,20 @@ class MedicalEventController extends Controller
 
     public function store(SaveMedicalEventRequest $request): RedirectResponse
     {
-        MedicalEvent::create([...$this->data($request), 'created_by' => $request->user()->id]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request): void {
+            $event = MedicalEvent::create([...$this->data($request), 'created_by' => $request->user()->id]);
+            app(\App\Services\AccessPolicy::class)->audit($request->user(), 'medical.result_create', ['medical_event_id' => $event->id, 'application_id' => $event->application_id]);
+        });
 
         return to_route('medical-events.index')->with('success', 'Jadwal MCU berhasil disimpan.');
     }
 
     public function update(SaveMedicalEventRequest $request, MedicalEvent $medical_event): RedirectResponse
     {
-        $data = $this->data($request);
-        $medical_event->update($data);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $medical_event): void {
+            $data = $this->data($request);
+            $medical_event->update($data);
+        });
         app(\App\Services\AccessPolicy::class)->audit($request->user(), 'medical.result_update', ['medical_event_id' => $medical_event->id, 'application_id' => $medical_event->application_id]);
 
         return to_route('medical-events.index')->with('success', 'Data MCU berhasil diperbarui.');

@@ -92,6 +92,9 @@ class TrainingEnrollmentController extends Controller
                 throw ValidationException::withMessages(['batch_id' => 'Pendaftaran hanya tersedia untuk angkatan direncanakan atau berlangsung pada LPK yang tersedia.']);
             }
             $application = Application::withTrashed()->findOrFail($data['application_id']);
+            if (in_array($data['status'], ['ongoing', 'completed'], true)) {
+                app(\App\Services\TrustCommitmentProtocol::class)->authorize($request->user(), $application, 'protocol.placement');
+            }
             if ($application->trashed() && ! $sameApplication) {
                 throw ValidationException::withMessages(['application_id' => 'Lamaran sudah dihapus.']);
             }
