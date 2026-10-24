@@ -49,7 +49,7 @@ class TrustCommitmentController extends Controller
         $stage = $run ? DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->first() : null;
         $gate = $run ? $this->protocol->gate($application, $run) : null;
         $can = fn (string $permission): bool => app(AccessPolicy::class)->applicationIds($request->user(), $permission)->where('applications.id', $application->id)->exists();
-        $canAct = $run && $can('process.update') && $can($definition['stages'][$run->stage]['permission']);
+        $canAct = ! in_array($application->status, TrustCommitmentProtocol::TERMINAL, true) && $run && $can('process.update') && $can($definition['stages'][$run->stage]['permission']);
         $content = DB::table('protocol_content_versions')->where('status', 'Approved')->where('effective_at', '<=', now())->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))->where(fn ($q) => $q->whereNull('vacancy_id')->orWhere('vacancy_id', $application->vacancy_id))->get();
         $consent = $run && $can('document.read.metadata') ? DB::table('protocol_family_consents')->where('run_id', $run->id)->first() : null;
         $appointment = $run ? DB::table('protocol_appointments')->where('run_id', $run->id)->first() : null;

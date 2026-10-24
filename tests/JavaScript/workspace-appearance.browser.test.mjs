@@ -73,8 +73,8 @@ test('all CRM menus and forms use readable dark surfaces and fit mobile', {skip:
                     const rgb=color=>(color.match(/[\\d.]+/g)||[]).map(Number);
                     const luminance=color=>{const channels=rgb(color).slice(0,3).map(channel=>{const v=channel/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;};
                     const background=node=>{while(node){const value=getComputedStyle(node).backgroundColor,channels=rgb(value);if(channels.length===3||channels[3]>=.95)return value;node=node.parentElement;}return ${theme==='dark'?"'rgb(15,23,42)'":"'rgb(255,255,255)'"};};
-                    if(${theme==='dark'})for(const node of main.querySelectorAll('section,article,dialog,[class]')){
-                        if(!visible(node)||node.matches('svg,svg *,img,canvas,iframe,input[type=color],.sc-color,[data-color-swatch]'))continue;const color=getComputedStyle(node).backgroundColor,channels=rgb(color);if((channels.length===3||channels[3]>.9)&&Math.min(...channels.slice(0,3))>170)issues.push('light surface '+node.tagName+'.'+node.className+' '+color);
+                    if(${theme==='dark'})for(const node of main.querySelectorAll('section,article,dialog,[class],a,button')){
+                        if(!visible(node)||node.matches('svg,svg *,img,canvas,iframe,input[type=color],.sc-color,[data-color-swatch]'))continue;const color=getComputedStyle(node).backgroundColor,channels=rgb(color);if((channels.length===3||channels[3]>.9)&&Math.min(...channels.slice(0,3))>170)issues.push('light surface '+node.tagName+'.'+node.className+' in '+node.parentElement.className+' '+node.textContent.trim().slice(0,35)+' '+color);
                     }
                     for(const node of main.querySelectorAll('form input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),form select,form textarea')){
                         if(!visible(node))continue;const box=node.getBoundingClientRect(),style=getComputedStyle(node);

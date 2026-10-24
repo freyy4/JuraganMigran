@@ -9,6 +9,8 @@
     <header class="care-heading"><div><h1>{{ $application->candidate->person?->full_name }}</h1><p>{{ $application->application_code }} · {{ $application->vacancy?->title }} · {{ $application->vacancy?->jobOrder?->country?->name }}</p></div><strong>{{ $run?->mode ?? 'Belum dipetakan' }} · v8.27</strong></header>
     @if(!$run)
         <section class="care-panel"><h2>Review pemetaan proses lama</h2><p>Tahap pipeline tetap {{ $application->currentStage?->name ?: 'belum ditetapkan' }}. Mulai Shadow untuk memetakan bukti proses yang tersedia.</p>@if($can('process.update'))<form action="{{ route('protocol.action',$application) }}" method="POST">@include('protocol.context',['operation'=>'start'])<button class="care-button primary">Mulai mode Shadow</button></form>@endif</section>
+    @elseif(!$stage)
+        <section class="care-panel"><h2>Proses sudah ditutup</h2><p>Riwayat gate dan handoff tetap tersimpan pada JM Care. Status lamaran: {{ $application->status }}.</p></section>
     @else
     <ol class="protocol-strip" aria-label="Urutan protokol">@foreach($definition['stages'] as $key=>$item)<li @if($run->stage===$key) aria-current="step" @endif><span>{{ $loop->iteration-1 }}</span>{{ $item['label'] }}</li>@endforeach</ol>
     <div class="protocol-columns"><main>

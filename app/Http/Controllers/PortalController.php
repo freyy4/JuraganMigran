@@ -19,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -169,7 +170,7 @@ class PortalController extends Controller
             return [];
         }
         $schedules = collect();
-        $packages = \Illuminate\Support\Facades\Schema::hasTable('protocol_appointments') ? DB::table('protocol_appointments as p')->join('protocol_runs as r', 'r.id', '=', 'p.run_id')->where('r.application_id', $application->id)->where('p.status', 'CONFIRMED')->where('p.scheduled_at', '>=', now())->get(['p.*']) : collect();
+        $packages = Schema::hasTable('protocol_appointments') ? DB::table('protocol_appointments as p')->join('protocol_runs as r', 'r.id', '=', 'p.run_id')->where('r.application_id', $application->id)->where('p.status', 'CONFIRMED')->where('p.scheduled_at', '>=', now())->get(['p.*']) : collect();
         foreach ($packages as $package) {
             $items = collect(json_decode($package->checklist, true))->where('original', true)->pluck('name')->implode(', ');
             $schedules->push(['id' => 'appointment-'.$package->id, 'title' => 'Kunjungan kantor, dokumen asli & MCU', 'at' => $package->scheduled_at, 'location' => $package->office_location, 'instructions' => 'Transport: '.$package->transport.'. Dokumen asli: '.($items ?: 'Konfirmasikan checklist kepada CS').'.']);

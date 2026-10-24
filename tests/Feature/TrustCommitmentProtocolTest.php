@@ -10,8 +10,10 @@ use App\Models\DocumentType;
 use App\Models\HealthInterview;
 use App\Models\MedicalEvent;
 use App\Models\PipelineStage;
+use App\Models\TrainingBatch;
 use App\Models\TrainingEnrollment;
 use App\Models\User;
+use App\Services\CareJourney;
 use App\Services\ProcessStageTransition;
 use App\Services\TrustCommitmentProtocol;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -55,7 +57,7 @@ class TrustCommitmentProtocolTest extends TestCase
     private function moveFixture(Application $app, string $stage): void
     {
         $run = DB::table('protocol_runs')->where('application_id', $app->id)->firstOrFail();
-        DB::table('protocol_stage_instances')->where('run_id', $run->id)->update(['stage' => $stage]);
+        DB::table('protocol_stage_instances')->where('run_id', $run->id)->update(['stage' => $stage, 'queue' => config('protocol.stages.'.$stage.'.queue'), 'next_action' => config('protocol.stages.'.$stage.'.action')]);
         DB::table('protocol_runs')->where('id', $run->id)->update(['stage' => $stage]);
     }
 
@@ -173,7 +175,7 @@ class TrustCommitmentProtocolTest extends TestCase
         Storage::fake('documents');
         $app = $this->setupApplication();
         $type = DocumentType::factory()->create();
-        DB::table('care_journey_templates')->where('id', app(\App\Services\CareJourney::class)->template($app)->id)->update(['policy' => json_encode(['consent_required' => true, 'consent_document_type_id' => $type->id])]);
+        DB::table('care_journey_templates')->where('id', app(CareJourney::class)->template($app)->id)->update(['policy' => json_encode(['consent_required' => true, 'consent_document_type_id' => $type->id])]);
         $this->moveFixture($app, 'family');
         $this->post(route('protocol.action', $app), $this->payload($app, 'advance'))->assertSessionHasErrors('gate');
         $contact = $app->candidate->contacts()->create(['name' => 'Wali uji', 'relationship' => 'Orang tua']);
@@ -374,6 +376,7 @@ class TrustCommitmentProtocolTest extends TestCase
             file_put_contents($directory.'/manifest.json', json_encode($manifest));
         }
     }
+
     public function test_corrected_medical_result_returns_accountability_and_reopens_fit_safely(): void
     {
         $app = $this->setupApplication();
@@ -409,7 +412,7 @@ class TrustCommitmentProtocolTest extends TestCase
     public function test_early_admission_and_expired_fit_cannot_bypass_enforced_gates(): void
     {
         $app = $this->setupApplication();
-        $batch = \App\Models\TrainingBatch::factory()->create();
+        $batch = TrainingBatch::factory()->create();
         $this->post(route('training.store'), ['application_id' => $app->id, 'batch_id' => $batch->id, 'status' => 'ongoing', 'joined_at' => now('Asia/Jakarta')->toDateString()])->assertSessionHasErrors('application_id');
         $this->moveFixture($app, 'waiting');
         $medical = MedicalEvent::factory()->create(['application_id' => $app->id, 'status' => 'completed', 'completed_at' => now(), 'clearance_status' => 'fit', 'expires_at' => now('Asia/Jakarta')->toDateString()]);
@@ -421,4 +424,15 @@ class TrustCommitmentProtocolTest extends TestCase
         $this->assertSame(0, DB::table('training_enrollments')->count());
     }
 
+    public function test_closed_applications_leave_work_queues_without_losing_their_history(): void
+    {
+        $app = $this->setupApplication('SHADOW');
+        $app->update(['status' => 'withdrawn']);
+        $this->artisan('care:monitor')->assertSuccessful();
+        $this->artisan('care:monitor')->assertSuccessful();
+        $this->assertSame(0, DB::table('protocol_stage_instances')->whereNull('exited_at')->count());
+        $this->assertSame(0, app(TrustCommitmentProtocol::class)->queue(auth()->user())->count());
+        $this->get(route('protocol.show', $app))->assertOk()->assertSee('Proses sudah ditutup');
+        $this->assertSame(1, DB::table('care_events')->where('event_type', 'PROTOCOL_CLOSED')->count());
+    }
 }

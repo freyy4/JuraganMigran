@@ -98,6 +98,7 @@ class CareJourney
             }
         }
         $template->stages = json_encode($ordered);
+
         return $template;
     }
 

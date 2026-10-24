@@ -20,6 +20,8 @@ use Illuminate\Validation\ValidationException;
 
 class TrustCommitmentProtocol
 {
+    public const TERMINAL = ['closed', 'cancelled', 'withdrawn', 'rejected', 'completed', 'departed'];
+
     public function available(): bool
     {
         return config('protocol.enabled') && Schema::hasTable('protocol_runs');
@@ -38,6 +40,7 @@ class TrustCommitmentProtocol
         foreach (config('protocol.stages') as $key => $fallback) {
             $policy['stages'][$key] = $stored[$key] ?? $fallback;
         }
+
         return $policy;
     }
 
@@ -125,7 +128,9 @@ class TrustCommitmentProtocol
         $exists = DB::table('care_events')->where('source_key', $key)->exists();
         app(CareJourney::class)->event(Candidate::withoutGlobalScopes()->findOrFail($application->candidate_id), $key, $type, $payload, $permission, auth()->user(), $application->id, true, $this->careStage($type));
         if (! $exists && in_array($type, ['APPOINTMENT_CONFIRMED', 'APPOINTMENT_REMINDER', 'MCU_FIT', 'LPK_ADMITTED'], true) && DB::table('portal_accounts')->where('candidate_id', $application->candidate_id)->where('status', 'active')->where('in_app_notifications', true)->exists()) {
-            DB::table('portal_notifications')->insert(['candidate_id' => $application->candidate_id, 'category' => 'PROCESS_UPDATE', 'title' => match ($type) { 'APPOINTMENT_CONFIRMED' => 'Kunjungan Anda diperbarui', 'APPOINTMENT_REMINDER' => 'Pengingat kunjungan kantor', 'MCU_FIT' => 'Persiapan masuk LPK', default => 'Masuk LPK terkonfirmasi' }, 'body_safe' => 'Periksa jadwal dan langkah berikutnya di portal. Hubungi CS jika membutuhkan bantuan.', 'deep_link' => '/portal/schedules', 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('portal_notifications')->insert(['candidate_id' => $application->candidate_id, 'category' => 'PROCESS_UPDATE', 'title' => match ($type) {
+                'APPOINTMENT_CONFIRMED' => 'Kunjungan Anda diperbarui', 'APPOINTMENT_REMINDER' => 'Pengingat kunjungan kantor', 'MCU_FIT' => 'Persiapan masuk LPK', default => 'Masuk LPK terkonfirmasi'
+            }, 'body_safe' => 'Periksa jadwal dan langkah berikutnya di portal. Hubungi CS jika membutuhkan bantuan.', 'deep_link' => '/portal/schedules', 'created_at' => now(), 'updated_at' => now()]);
         }
     }
 
@@ -205,7 +210,7 @@ class TrustCommitmentProtocol
 
     public function checklist(Application $application): array
     {
-        return app(DocumentRequirementEngine::class)->rows($application)->map(fn ($row) => ['type_id' => (int) $row['rule']->document_type_id, 'name' => $row['rule']->documentType?->name, 'required' => (bool) $row['rule']->is_required, 'original' => (bool) $row['rule']->original_required, 'status' => $row['status'], 'verified' => (bool) $row['verified']])->values()->all();
+        return app(DocumentRequirementEngine::class)->rows($application)->map(fn ($row) => ['type_id' => (int) $row['rule']->document_type_id, 'name' => $row['rule']->documentType?->name, 'required' => (bool) $row['rule']->is_required && $row['applies'], 'original' => (bool) $row['rule']->original_required && $row['applies'], 'status' => $row['status'], 'verified' => (bool) $row['verified']])->values()->all();
     }
 
     private function documentsDiscovered(Application $application, array $action): bool
@@ -243,6 +248,7 @@ class TrustCommitmentProtocol
         DB::transaction(function () use ($actor, $application, $data): void {
             $application = Application::withoutGlobalScopes()->whereKey($application->id)->lockForUpdate()->firstOrFail();
             $run = DB::table('protocol_runs')->where('application_id', $application->id)->lockForUpdate()->first() ?? $this->initialize($application);
+            abort_if(in_array($application->status, self::TERMINAL, true), 409, 'Lamaran sudah ditutup. Buka versi terbaru untuk melihat riwayat.');
             $fingerprint = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
             if ($previous = DB::table('protocol_actions')->where('request_key', $data['request_key'])->first()) {
                 abort_unless($previous->run_id === $run->id && $previous->actor_id === $actor->id && hash_equals($previous->fingerprint, $fingerprint), 409, 'Kunci permintaan sudah digunakan untuk aksi berbeda.');
@@ -506,6 +512,7 @@ class TrustCommitmentProtocol
                     $this->openStage($application, $run, 'result');
                     $this->event($application, 'protocol-medical-review:'.$run->id.':'.$run->version, 'PROTOCOL_MEDICAL_REVIEW', ['title' => 'Hasil resmi berubah atau kedaluwarsa: koordinasi medis diperlukan'], 'health.mcu.summary.read');
                 }
+
                 return;
             }
             if ($golden && in_array($golden->status, ['OPEN', 'CLOSED'], true)) {
@@ -611,6 +618,19 @@ class TrustCommitmentProtocol
                         return;
                     }
                     $run = DB::table('protocol_runs')->where('id', $item->id)->lockForUpdate()->firstOrFail();
+                    if (in_array($application->status, self::TERMINAL, true)) {
+                        $active = DB::table('protocol_stage_instances')->where('run_id', $run->id)->whereNull('exited_at')->first();
+                        if ($active) {
+                            DB::table('protocol_stage_instances')->where('id', $active->id)->update(['exited_at' => now()]);
+                            Task::withoutGlobalScopes()->whereKey($active->task_id)->whereNotIn('status', [...Task::COMPLETED_STATUSES, 'cancelled'])->update(['status' => 'cancelled']);
+                            DB::table('protocol_golden_windows')->where('run_id', $run->id)->where('status', 'OPEN')->update(['status' => 'CANCELLED', 'updated_at' => now()]);
+                            DB::table('protocol_runs')->where('id', $run->id)->increment('version');
+                            $this->event($application, 'protocol-closed:'.$run->id, 'PROTOCOL_CLOSED', ['title' => 'Protokol selesai mengikuti status lamaran']);
+                        }
+
+                        return;
+                    }
+
                     if (in_array($run->stage, ['golden', 'onboarding'], true)) {
                         $medical = MedicalEvent::withoutGlobalScopes()->where('application_id', $application->id)->latest('id')->first();
                         if ($medical && ! $this->validFit($medical)) {
@@ -667,6 +687,6 @@ class TrustCommitmentProtocol
 
     public function queue(User $actor): Collection
     {
-        return DB::table('protocol_stage_instances as s')->join('protocol_runs as r', 'r.id', '=', 's.run_id')->join('applications as a', 'a.id', '=', 'r.application_id')->join('candidates as c', 'c.id', '=', 'a.candidate_id')->join('persons as p', 'p.id', '=', 'c.person_id')->leftJoin('users as u', 'u.id', '=', 's.owner_id')->leftJoin('protocol_golden_windows as g', 'g.run_id', '=', 'r.id')->whereNull('s.exited_at')->whereNull('a.deleted_at')->whereIn('a.id', app(AccessPolicy::class)->applicationIds($actor, 'process.read')->select('applications.id'))->select('s.*', 'r.application_id', 'r.mode', 'r.version', 'p.full_name', 'c.id as candidate_id', 'u.name as owner_name', 'g.fit_at', 'g.closed_at', 'g.escalation_level', 'g.status as golden_status')->orderBy('s.due_at')->get();
+        return DB::table('protocol_stage_instances as s')->join('protocol_runs as r', 'r.id', '=', 's.run_id')->join('applications as a', 'a.id', '=', 'r.application_id')->join('candidates as c', 'c.id', '=', 'a.candidate_id')->join('persons as p', 'p.id', '=', 'c.person_id')->leftJoin('users as u', 'u.id', '=', 's.owner_id')->leftJoin('protocol_golden_windows as g', 'g.run_id', '=', 'r.id')->whereNull('s.exited_at')->whereNull('a.deleted_at')->whereNotIn('a.status', self::TERMINAL)->whereIn('a.id', app(AccessPolicy::class)->applicationIds($actor, 'process.read')->select('applications.id'))->select('s.*', 'r.application_id', 'r.mode', 'r.version', 'p.full_name', 'c.id as candidate_id', 'u.name as owner_name', 'g.fit_at', 'g.closed_at', 'g.escalation_level', 'g.status as golden_status')->orderBy('s.due_at')->get();
     }
 }
